@@ -3,16 +3,16 @@ using System.Data.SqlClient;
 
 namespace DBAccess.ConnectedLayer
 {
-    public class DBConnection
+    public static class DBConnection
     {
-        public SqlConnection OpenConnection()
+        public static SqlConnection OpenConnection()
         {
             
             SqlConnection DBConnection =  new SqlConnection { ConnectionString = ConfigurationManager.ConnectionStrings["BOMDB"].ToString() };
             DBConnection.Open();
             return DBConnection;
         }
-        public void CloseConnection(SqlConnection sqlConnection)
+        public static void CloseConnection(SqlConnection sqlConnection)
         {
             sqlConnection.Close();
         }

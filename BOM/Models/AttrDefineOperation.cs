@@ -65,7 +65,7 @@ namespace BOM.Models
             }
             DBConnection.CloseConnection(sqlConnection);
         }
-        public List<AttrDefine> Query(string tmpId, string attrId, string attrNm, string attrTp)
+        public List<AttrDefine> Query(string tmpId = null, string attrId = null, string attrNm = null, string attrTp = null)
         {
             SqlConnection sqlConnection = DBConnection.OpenConnection();
             

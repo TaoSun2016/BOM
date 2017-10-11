@@ -1,17 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Data.SqlClient;
-using System.Data;
 
 namespace DBAccess.ConnectedLayer
 {
     public class AttrDefineOperation
-    {
-         
-
+    {       
         public void Insert(string tmpId, string attrId, string attrNm, char attrTp, string crter)
         {
             SqlConnection sqlConnection = DBConnection.OpenConnection();
@@ -58,6 +52,19 @@ namespace DBAccess.ConnectedLayer
             DBConnection.CloseConnection(sqlConnection);
         }
 
+        public void Lock( string tmpId, string attrId, string attrNm, char attrTp, int lockFlag, string updter)
+        {
+            SqlConnection sqlConnection = DBConnection.OpenConnection();
+            string updtDate = DateTime.Now.ToString("yyyyMMdd HH:mm:ss");
+
+            string sql = $"UPDATE AttrDefine SET LockFlag = '{lockFlag}' WHERE TmpId = '{tmpId}' AND AttrId='{attrId}' AND AttrNm='{attrNm}' AND AttrTp='{attrTp}'";
+
+            using (SqlCommand command = new SqlCommand(sql, sqlConnection))
+            {
+                command.ExecuteNonQuery();
+            }
+            DBConnection.CloseConnection(sqlConnection);
+        }
         public List<AttrDefine> Query(string tmpId, string attrId, string attrNm, string attrTp)
         {
             SqlConnection sqlConnection = DBConnection.OpenConnection();

@@ -1,7 +1,7 @@
 ﻿using System.Configuration;
 using System.Data.SqlClient;
 
-namespace DBAccess.ConnectedLayer
+namespace BOM.Models
 {
     public static class DBConnection
     {

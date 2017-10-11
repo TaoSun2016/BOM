@@ -90,6 +90,8 @@
       <DependentUpon>Global.asax</DependentUpon>
     </Compile>
     <Compile Include="Models\AttrDefine.cs" />
+    <Compile Include="Models\AttrDefineOperation.cs" />
+    <Compile Include="Models\DBConnection.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

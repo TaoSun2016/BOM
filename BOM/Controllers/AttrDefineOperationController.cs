@@ -12,30 +12,42 @@ namespace BOM.Controllers
     {
         AttrDefineOperation operation = new AttrDefineOperation();
         // GET: api/AttrDefineOperation
+        [HttpGet]
         public List<AttrDefine> Get()
         {
             return operation.Query();
         }
 
         // GET: api/AttrDefineOperation/5
-        public List<AttrDefine> Get(string tmpId, string attrId, string attrNm, string attrTp)
+        [HttpGet]
+        public AttrDefine GetOne(string tmpId, string attrId, string attrNm, string attrTp)
         {
-            return operation.Query( tmpId,  attrId,  attrNm,  attrTp);
+            return operation.QueryOne( tmpId,  attrId,  attrNm,  attrTp);
         }
 
         // POST: api/AttrDefineOperation
-        public void Post([FromBody]string value)
+        [HttpPost]
+        public void Post(AttrDefine attrDefine)
         {
+            if (ModelState.IsValid)
+            {
+                operation.Insert(attrDefine);
+            }
+            
         }
 
         // PUT: api/AttrDefineOperation/5
-        public void Put(int id, [FromBody]string value)
+        [HttpPut]
+        public void Put(string oldTmpId, string oldAttrId, string oldAttrNm, string oldAttrTp, AttrDefine attrDefine)
         {
+            operation.Update(oldTmpId,  oldAttrId, oldAttrNm, oldAttrTp, attrDefine.TmpId,attrDefine.AttrId,attrDefine.AttrNm,attrDefine.AttrTp,attrDefine.LstUpdter);
         }
 
         // DELETE: api/AttrDefineOperation/5
-        public void Delete(int id)
+        [HttpDelete]
+        public void Delete(string tmpId, string attrId, string attrNm, string attrTp)
         {
+            operation.Delete(tmpId, attrId, attrNm, attrTp);
         }
     }
 }

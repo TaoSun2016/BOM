@@ -18,6 +18,19 @@ namespace BOM.Models
             }
             DBConnection.CloseConnection(sqlConnection);
         }
+
+        public void Insert(AttrDefine attrDefine)
+        {
+            SqlConnection sqlConnection = DBConnection.OpenConnection();
+
+            string crtDate = DateTime.Now.ToString("yyyyMMdd HH:mm:ss");
+            string sql = "INSERT INTO AttrDefine " + $"(TmpId, AttrId, AttrNm, AttrTp,CrtDate, Crter) Values ('{attrDefine.TmpId}','{attrDefine.AttrId}', '{attrDefine.AttrNm}', '{attrDefine.AttrTp}', '{crtDate}','{attrDefine.Crter}')";
+            using (SqlCommand command = new SqlCommand(sql, sqlConnection))
+            {
+                command.ExecuteNonQuery();
+            }
+            DBConnection.CloseConnection(sqlConnection);
+        }
         public void Delete(string tmpId, string attrId, string attrNm, string attrTp)
         {
             SqlConnection sqlConnection = DBConnection.OpenConnection();
@@ -112,6 +125,43 @@ namespace BOM.Models
             DBConnection.CloseConnection(sqlConnection);
             return list;
             
+        }
+
+        public AttrDefine QueryOne(string tmpId, string attrId, string attrNm, string attrTp)
+        {
+            SqlConnection sqlConnection = DBConnection.OpenConnection();
+
+            List<AttrDefine> list = new List<AttrDefine>();
+
+            string sql = "SELECT * FROM AttrDefine WHERE 0 = 0"
+                       + $" AND TmpId = '{tmpId}'"            
+                       + $" AND AttrId = '{attrId}'"
+                       + $" AND AttrNm = '{attrNm}'"
+                       + $" AND AttrTp = '{attrTp}'";
+            AttrDefine attrDefine = null;
+            using (SqlCommand command = new SqlCommand(sql, sqlConnection))
+            {
+                SqlDataReader dataReader = command.ExecuteReader();
+                
+                if (dataReader.HasRows) {
+                    dataReader.Read();
+                    attrDefine = new AttrDefine{
+                        TmpId = dataReader["TmpId"].ToString(),
+                        AttrId = dataReader["AttrId"].ToString(),
+                        AttrNm = dataReader["AttrNm"].ToString(),
+                        AttrTp = dataReader["AttrTp"].ToString(),
+                        LockFlag = (int)dataReader["LockFlag"],
+                        CrtDate = dataReader["CrtDate"].ToString(),
+                        Crter = dataReader["Crter"].ToString(),
+                        LstUpdtDate = dataReader["LstUpdtDate"].ToString(),
+                        LstUpdter = dataReader["LstUpdter"].ToString(),
+                    };
+                }
+                dataReader.Close();
+            }
+            DBConnection.CloseConnection(sqlConnection);
+            return attrDefine;
+
         }
     }
 }

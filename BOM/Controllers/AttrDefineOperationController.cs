@@ -32,6 +32,8 @@ namespace BOM.Controllers
             if (ModelState.IsValid)
             {
                 operation.Insert(attrDefine);
+                //ProcessResult processResult = new ProcessResult() {ResultCode="000000",ResultMessage="插入成功" };
+                //HttpResponse
             }
             
         }

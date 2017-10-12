@@ -93,6 +93,7 @@
     <Compile Include="Models\AttrDefine.cs" />
     <Compile Include="Models\AttrDefineOperation.cs" />
     <Compile Include="Models\DBConnection.cs" />
+    <Compile Include="Models\ProcessResult.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

@@ -51,12 +51,12 @@ namespace BOM.Models
 
         }
 
-        public void Update(string oldTmpId, string oldAttrId, string oldAttrNm, string oldAttrTp, string tmpId, string attrId, string attrNm, string attrTp, string updter)
+        public void Update(string oldTmpId, string oldAttrId, string oldAttrNm, string oldAttrTp, string tmpId, string attrId, string attrNm, string attrTp, string lstupdter)
         {
             SqlConnection sqlConnection = DBConnection.OpenConnection();
             string updtDate = DateTime.Now.ToString("yyyyMMdd HH:mm:ss");
 
-            string sql = $"UPDATE AttrDefine SET TmpId = '{tmpId}' , AttrId='{attrId}' , AttrNm='{attrNm}' , AttrTp='{attrTp}' , LstUpdtDate='{updtDate}' , LstUpdter='{updter}'  WHERE TmpId = '{oldTmpId}' AND AttrId='{oldAttrId}' AND AttrNm='{oldAttrNm}' AND AttrTp='{oldAttrTp}' AND LockFlag='0'";
+            string sql = $"UPDATE AttrDefine SET TmpId = '{tmpId}' , AttrId='{attrId}' , AttrNm='{attrNm}' , AttrTp='{attrTp}' , LstUpdtDate='{updtDate}' , LstUpdter='{lstupdter}'  WHERE TmpId = '{oldTmpId}' AND AttrId='{oldAttrId}' AND AttrNm='{oldAttrNm}' AND AttrTp='{oldAttrTp}' AND LockFlag='0'";
 
             using (SqlCommand command = new SqlCommand(sql, sqlConnection))
             {

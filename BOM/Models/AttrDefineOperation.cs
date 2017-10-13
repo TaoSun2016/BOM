@@ -129,6 +129,7 @@ namespace BOM.Models
 
         public AttrDefine QueryOne(string tmpId, string attrId, string attrNm, string attrTp)
         {
+            
             SqlConnection sqlConnection = DBConnection.OpenConnection();
 
             List<AttrDefine> list = new List<AttrDefine>();

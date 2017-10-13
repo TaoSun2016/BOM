@@ -8,18 +8,21 @@ using System.Web.Http;
 
 namespace BOM.Controllers
 {
+    [RoutePrefix("Attribute")]
     public class AttrDefineOperationController : ApiController
     {
         AttrDefineOperation operation = new AttrDefineOperation();
-        // GET: api/AttrDefineOperation
+
         [HttpGet]
+        [Route("GetAll")]
         public List<AttrDefine> Get()
         {
             return operation.Query();
         }
 
-        // GET: api/AttrDefineOperation/5
+
         [HttpGet]
+        [Route("GetOne")]
         public AttrDefine GetOne(string tmpId, string attrId, string attrNm, string attrTp)
         {
             return operation.QueryOne( tmpId,  attrId,  attrNm,  attrTp);
@@ -27,6 +30,7 @@ namespace BOM.Controllers
 
         // POST: api/AttrDefineOperation
         [HttpPost]
+        [Route("Create")]
         public void Post(AttrDefine attrDefine)
         {
             if (ModelState.IsValid)
@@ -40,6 +44,7 @@ namespace BOM.Controllers
 
         // PUT: api/AttrDefineOperation/5
         [HttpPut]
+        [Route("Update")]
         public void Put(string oldTmpId, string oldAttrId, string oldAttrNm, string oldAttrTp, AttrDefine attrDefine)
         {
             operation.Update(oldTmpId,  oldAttrId, oldAttrNm, oldAttrTp, attrDefine.TmpId,attrDefine.AttrId,attrDefine.AttrNm,attrDefine.AttrTp,attrDefine.LstUpdter);
@@ -47,6 +52,7 @@ namespace BOM.Controllers
 
         // DELETE: api/AttrDefineOperation/5
         [HttpDelete]
+        [Route("Delete")]
         public void Delete(string tmpId, string attrId, string attrNm, string attrTp)
         {
             operation.Delete(tmpId, attrId, attrNm, attrTp);

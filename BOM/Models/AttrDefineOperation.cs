@@ -1,23 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data.SqlClient;
+using System.Net;
+using System.Net.Http;
+using System.Web.Http;
 
 namespace BOM.Models
 {
     public class AttrDefineOperation
-    {       
-        public void Insert(string tmpId, string attrId, string attrNm, string attrTp, string crter)
-        {
-            SqlConnection sqlConnection = DBConnection.OpenConnection();
-
-            string crtDate = DateTime.Now.ToString("yyyyMMdd HH:mm:ss");
-            string sql = "INSERT INTO AttrDefine " + $"(TmpId, AttrId, AttrNm, AttrTp,CrtDate, Crter) Values ('{tmpId}','{attrId}', '{attrNm}', '{attrTp}', '{crtDate}','{crter}')";
-            using (SqlCommand command = new SqlCommand(sql, sqlConnection))
-            {
-                command.ExecuteNonQuery();
-            }
-            DBConnection.CloseConnection(sqlConnection);
-        }
+    {
+        log4net.ILog log = log4net.LogManager.GetLogger("AttrDefineOperation");
 
         public void Insert(AttrDefine attrDefine)
         {
@@ -27,7 +19,16 @@ namespace BOM.Models
             string sql = "INSERT INTO AttrDefine " + $"(TmpId, AttrId, AttrNm, AttrTp,CrtDate, Crter) Values ('{attrDefine.TmpId}','{attrDefine.AttrId}', '{attrDefine.AttrNm}', '{attrDefine.AttrTp}', '{crtDate}','{attrDefine.Crter}')";
             using (SqlCommand command = new SqlCommand(sql, sqlConnection))
             {
-                command.ExecuteNonQuery();
+                try
+                {
+                    command.ExecuteNonQuery();
+                }
+                catch (Exception e)
+                {
+                    log.Error("INSERT INTO AttrDefine ERROR!", e);
+                    DBConnection.CloseConnection(sqlConnection);
+                    throw;
+                }
             }
             DBConnection.CloseConnection(sqlConnection);
         }
@@ -132,8 +133,6 @@ namespace BOM.Models
             
             SqlConnection sqlConnection = DBConnection.OpenConnection();
 
-            List<AttrDefine> list = new List<AttrDefine>();
-
             string sql = "SELECT * FROM AttrDefine WHERE 0 = 0"
                        + $" AND TmpId = '{tmpId}'"            
                        + $" AND AttrId = '{attrId}'"
@@ -143,10 +142,13 @@ namespace BOM.Models
             using (SqlCommand command = new SqlCommand(sql, sqlConnection))
             {
                 SqlDataReader dataReader = command.ExecuteReader();
-                
-                if (dataReader.HasRows) {
+
+
+                if (dataReader.HasRows)
+                {
                     dataReader.Read();
-                    attrDefine = new AttrDefine{
+                    attrDefine = new AttrDefine
+                    {
                         TmpId = dataReader["TmpId"].ToString(),
                         AttrId = dataReader["AttrId"].ToString(),
                         AttrNm = dataReader["AttrNm"].ToString(),
@@ -157,8 +159,21 @@ namespace BOM.Models
                         LstUpdtDate = dataReader["LstUpdtDate"].ToString(),
                         LstUpdter = dataReader["LstUpdter"].ToString(),
                     };
+                    dataReader.Close();
                 }
-                dataReader.Close();
+                else {
+                    dataReader.Close();
+                    DBConnection.CloseConnection(sqlConnection);
+                    string logMessage = string.Format("未找到记录!TmpId[{0}]AttrId[{1}]AttrNm[{2}]AttrTp[{3}]", tmpId, attrId, attrNm, attrTp);
+                    log.Error(logMessage);
+                    var responseMessge = new HttpResponseMessage(HttpStatusCode.NotFound)
+                    {
+                        Content = new StringContent(logMessage),
+                        ReasonPhrase = "AttrDefine record not found"
+                    };
+                    throw new HttpResponseException(responseMessge);
+                }
+                
             }
             DBConnection.CloseConnection(sqlConnection);
             return attrDefine;

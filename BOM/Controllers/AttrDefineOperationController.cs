@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Reflection;
 using System.Web.Http;
 
 namespace BOM.Controllers
@@ -11,7 +12,10 @@ namespace BOM.Controllers
     [RoutePrefix("Attribute")]
     public class AttrDefineOperationController : ApiController
     {
+        Type type = MethodBase.GetCurrentMethod().DeclaringType;
+        log4net.ILog log = log4net.LogManager.GetLogger("Attribute");
         AttrDefineOperation operation = new AttrDefineOperation();
+
 
         [HttpGet]
         [Route("GetAll")]

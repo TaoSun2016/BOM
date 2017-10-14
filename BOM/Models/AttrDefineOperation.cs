@@ -124,7 +124,22 @@ namespace BOM.Models
                 dataReader.Close();
             }
             DBConnection.CloseConnection(sqlConnection);
-            return list;
+            if (list.Count == 0)
+            {
+                string logMessage = string.Format("未找到记录!TmpId[{0}]AttrId[{1}]AttrNm[{2}]AttrTp[{3}]", tmpId, attrId, attrNm, attrTp);
+                log.Error(logMessage);
+                var responseMessge = new HttpResponseMessage(HttpStatusCode.NotFound)
+                {
+                    Content = new StringContent(logMessage),
+                    ReasonPhrase = "AttrDefine record not found"
+                };
+                throw new HttpResponseException(responseMessge);
+            }
+            else
+            {
+                return list;
+            }
+           
             
         }
 

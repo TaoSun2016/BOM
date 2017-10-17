@@ -10,7 +10,6 @@ namespace BOM
         public static void Register(HttpConfiguration config)
         {
             // Web API configuration and services
-            GlobalConfiguration.Configuration.MessageHandlers.Add(new HttpMethodOverrideHandler());
             // Web API routes
             config.MapHttpAttributeRoutes();
 

@@ -11,7 +11,6 @@ namespace BOM
     {
         protected void Application_Start()
         {
-            GlobalConfiguration.Configuration.MessageHandlers.Add(new HttpMethodOverrideHandler());
             GlobalConfiguration.Configure(WebApiConfig.Register);
             log4net.Config.XmlConfigurator.Configure();
         }

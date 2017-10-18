@@ -15,6 +15,8 @@ namespace BOM.Models
             log4net.ILog log = log4net.LogManager.GetLogger("SeqNo");
             SqlConnection sqlConnection = DBConnection.OpenConnection();
             string sql = $"SELECT * FROM SEQ_NO WHERE Ind_Key = '{tmpId}'";
+
+
             using (SqlCommand command = new SqlCommand(sql, sqlConnection))
             {
                 SqlDataReader dataReader = command.ExecuteReader();

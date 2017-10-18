@@ -56,5 +56,27 @@ namespace BOM.Controllers
         {
             operation.Delete(tmpId, attrId, attrNm, attrTp);
         }
+
+        [HttpPost]
+        [Route("Batch")]
+        public void Batch(AttrDefineList list)
+        {
+            try
+            {
+                list.ExecuteBatch();
+            }
+            catch (Exception e)
+            {
+                string logMessage = string.Format($"批量更新AttrDefine出错!\n {e.StackTrace}");
+                log.Error(logMessage);
+                var responseMessge = new HttpResponseMessage(HttpStatusCode.InternalServerError)
+                {
+                    Content = new StringContent(logMessage),
+                    ReasonPhrase = "Batch update AttrDefine ERROR"
+                };
+                throw new HttpResponseException(responseMessge);
+            }
+
+        }
     }
 }

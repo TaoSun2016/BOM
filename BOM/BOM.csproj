@@ -94,6 +94,7 @@
     <Compile Include="Global.asax.cs">
       <DependentUpon>Global.asax</DependentUpon>
     </Compile>
+    <Compile Include="Models\AttrDefineList.cs" />
     <Compile Include="Models\SeqNo.cs" />
     <Compile Include="Models\AttrDefine.cs" />
     <Compile Include="Models\AttrDefineOperation.cs" />

@@ -79,10 +79,10 @@ namespace BOM.Models
             return seqNo;
         }
 
-        public long GetSubSeqNo(string tmpId)
+        public string GetSubSeqNo(string tmpId)
         {
             int result = 0;
-            long seqNo = 0;
+            string seqNo = null;
 
             SqlConnection sqlConnection = DBConnection.OpenConnection();
             string sql = $"SELECT * FROM SEQ_NO WHERE Ind_Key = '{tmpId}'";
@@ -100,7 +100,7 @@ namespace BOM.Models
 
                     dataReader.Close();
 
-                    seqNo = this.Next_No;
+                    seqNo = Convert.ToString(this.Next_No, 8);
                     this.Next_No += 1;
                     sql = $"UPDATE SEQ_NO SET NEXT_NO = {this.Next_No} WHERE IND_KEY = '{tmpId}'";
                 }

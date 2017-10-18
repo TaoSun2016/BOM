@@ -3,6 +3,12 @@ namespace BOM.Models
 {
     public partial class AttrDefine
     {
+        //I:Insert U:Update D:Delete
+        public char Option { get; set; }
+        public string OrigTmpId { get; set; }
+        public string OrigAttrId { get; set; }
+        public string OrigAttrNm { get; set; }
+        public string OrigAttrTp { get; set; }
         public string TmpId { get; set; }
         public string AttrId { get; set; }
         public string AttrNm { get; set; }

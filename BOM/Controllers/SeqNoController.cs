@@ -38,9 +38,9 @@ namespace BOM.Controllers
 
         [HttpGet]
         [Route("GetSub")]
-        public long Get(string tmpId)
+        public string Get(string tmpId)
         {
-            long newSeqNo = 0;
+            string newSeqNo = null;
             try
             {
                 SeqNo seqNo = new SeqNo();

@@ -90,9 +90,11 @@
   <ItemGroup>
     <Compile Include="App_Start\WebApiConfig.cs" />
     <Compile Include="Controllers\AttrDefineOperationController.cs" />
+    <Compile Include="Controllers\SeqNoController.cs" />
     <Compile Include="Global.asax.cs">
       <DependentUpon>Global.asax</DependentUpon>
     </Compile>
+    <Compile Include="Models\SeqNo.cs" />
     <Compile Include="Models\AttrDefine.cs" />
     <Compile Include="Models\AttrDefineOperation.cs" />
     <Compile Include="Models\DBConnection.cs" />

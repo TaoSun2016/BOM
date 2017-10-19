@@ -6,10 +6,7 @@ namespace BOM.Models
 {
     public partial class AttrDefineList
     {
-        //I:Insert U:Update D:Delete
-        public List<AttrDefine> list = new List<AttrDefine>();
-
-        public void ExecuteBatch()
+        public void ExecuteBatch(List<AttrDefine> list)
         {
             int result = 0;
             string sql = null;
@@ -29,7 +26,7 @@ namespace BOM.Models
                     {
                         case 'I':
                             DateTime crtDate = DateTime.Now;
-                            sql = $"INSERT INTO attribute (TmpId, AttrId, AttrNm, AttrTp,CrtDate, Crter) Values ('{attribute.TmpId}','{attribute.AttrId}', '{attribute.AttrNm}', '{attribute.AttrTp}', '{crtDate}','{attribute.Crter}')";
+                            sql = $"INSERT INTO AttrDefine (TmpId, AttrId, AttrNm, AttrTp,CrtDate, Crter) Values ('{attribute.TmpId}','{attribute.AttrId}', '{attribute.AttrNm}', '{attribute.AttrTp}', '{crtDate}','{attribute.Crter}')";
                             break;
                         case 'U':
                             DateTime updtDate = DateTime.Now;

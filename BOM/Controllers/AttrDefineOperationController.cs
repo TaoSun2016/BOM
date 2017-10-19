@@ -59,11 +59,12 @@ namespace BOM.Controllers
 
         [HttpPost]
         [Route("Batch")]
-        public void Batch(AttrDefineList list)
+        public void Batch(List<AttrDefine> list)
         {
+            AttrDefineList attrDefineList = new AttrDefineList();
             try
             {
-                list.ExecuteBatch();
+                attrDefineList.ExecuteBatch(list);
             }
             catch (Exception e)
             {

@@ -4,67 +4,122 @@ using System.Data.SqlClient;
 
 namespace BOM.Models
 {
-    public partial class AttrDefineList
+    public partial class Templet
     {
-        public void ExecuteBatch(List<AttrDefine> list)
+        log4net.ILog log = log4net.LogManager.GetLogger("Templet");
+
+        public void CreateTempletInfor(string templetName, string creater)
         {
             int result = 0;
             string sql = null;
-            log4net.ILog log = log4net.LogManager.GetLogger("attributeList");
 
             SqlConnection sqlConnection = DBConnection.OpenConnection();
-            SqlTransaction sqlTransaction = sqlConnection.BeginTransaction();
             using (SqlCommand command = new SqlCommand())
             {
                 command.Connection = sqlConnection;
-                command.Transaction = sqlTransaction;
-
-
-                foreach (AttrDefine attribute in list)
+                sql = $"SELECT COUNT(*) FROM TmpInfo WHERE TmpNm = '{templetName}' ";
+                command.CommandText = sql;
+                try
                 {
-                    switch (attribute.Option)
-                    {
-                        case 'I':
-                            DateTime crtDate = DateTime.Now;
-                            sql = $"INSERT INTO AttrDefine (TmpId, AttrId, AttrNm, AttrTp,CrtDate, Crter) Values ('{attribute.TmpId}','{attribute.AttrId}', '{attribute.AttrNm}', '{attribute.AttrTp}', '{crtDate}','{attribute.Crter}')";
-                            break;
-                        case 'U':
-                            DateTime updtDate = DateTime.Now;
-                            sql = $"UPDATE AttrDefine SET TmpId = '{attribute.TmpId}' , AttrId='{attribute.AttrId}' , AttrNm='{attribute.AttrNm}' , AttrTp='{attribute.AttrTp}' , LstUpdtDate='{updtDate}' , LstUpdter='{attribute.LstUpdter}'  WHERE TmpId = '{attribute.OrigTmpId}' AND AttrId='{attribute.OrigAttrId}' AND AttrNm='{attribute.OrigAttrNm}' AND AttrTp='{attribute.OrigAttrTp}' AND LockFlag='0'";
-
-                            break;
-                        case 'D':
-                            sql = $"DELETE FROM AttrDefine WHERE TmpId = '{attribute.TmpId}' AND AttrId='{attribute.AttrId}' AND AttrNm='{attribute.AttrNm}' AND AttrTp='{attribute.AttrTp}'";
-                            break;
-                        default:
-                            log.Error(string.Format($"数据操作选项错误!\nOption[{attribute.Option}]"));
-                            sqlTransaction.Rollback();
-                            DBConnection.CloseConnection(sqlConnection);
-                            throw new Exception("数据操作选项错误!");
-                    }
-                    command.CommandText = sql;
-                    try
-                    {
-                        result = command.ExecuteNonQuery();
-                    }
-                    catch (Exception e)
-                    {
-                        log.Error(string.Format($"Update attrdefine error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                        sqlTransaction.Rollback();
-                        DBConnection.CloseConnection(sqlConnection);
-                        throw;
-                    }
-
-
-                    if (result == 0)
-                    {
-                        log.Error(string.Format($"无记录受影响!\nsql[{sql}]\n"));
-                        sqlTransaction.Rollback();
-                        DBConnection.CloseConnection(sqlConnection);
-                        throw new Exception("无记录受影响!");
-                    }
+                    result = (int)command.ExecuteScalar();
                 }
-                sqlTransaction.Commit();
+                catch (Exception e)
+                {
+                    log.Error(string.Format($"Select from table TmpInfo error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                    DBConnection.CloseConnection(sqlConnection);
+                    throw;
+                }
+
+                if (result > 0)
+                {
+                    log.Error(string.Format($"模板名称重复!Name=[{templetName}]\nsql[{sql}]\n"));
+                    DBConnection.CloseConnection(sqlConnection);
+                    throw new Exception("模板名称重复!");
+                }
+
+                SeqNo seqNo = new SeqNo();
+                string tmpId = seqNo.GetBaseSeqNo();
+                sql = $"INSERT INTO TmpInfo (TmpId, TmpNm, Root, LockCount, CrtDate, Crter, EditLock, DCM) VALUES ('{tmpId}', '{templetName}', '0', 0, {DateTime.Now}, '{creater}', 0, 0) ";
+                command.CommandText = sql;
+                try
+                {
+                    result = command.ExecuteNonQuery();
+                }
+                catch (Exception e)
+                {
+                    log.Error(string.Format($"Insert table TmpInfo error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                    DBConnection.CloseConnection(sqlConnection);
+                    throw;
+                }
+
+                if (result == 0)
+                {
+                    log.Error(string.Format($"插入TmpInfo记录数为0\nsql[{sql}]\n"));
+                    DBConnection.CloseConnection(sqlConnection);
+                    throw new Exception("插入TmpInfo记录数为0!");
+                }
+
+            }
+            DBConnection.CloseConnection(sqlConnection);
+        }
+
+        public void CreateTempletInfor(string refTempletId, string relation, string templetName, string creater)
+        {
+            int result = 0;
+            string sql = null;
+
+            SqlConnection sqlConnection = DBConnection.OpenConnection();
+            using (SqlCommand command = new SqlCommand())
+            {
+                command.Connection = sqlConnection;
+                sql = $"SELECT COUNT(*) FROM TmpInfo WHERE TmpNm = '{templetName}' ";
+                command.CommandText = sql;
+                try
+                {
+                    result = (int)command.ExecuteScalar();
+                }
+                catch (Exception e)
+                {
+                    log.Error(string.Format($"Select from table TmpInfo error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                    DBConnection.CloseConnection(sqlConnection);
+                    throw;
+                }
+
+                if (result > 0)
+                {
+                    log.Error(string.Format($"模板名称重复!Name=[{templetName}]\nsql[{sql}]\n"));
+                    DBConnection.CloseConnection(sqlConnection);
+                    throw new Exception("模板名称重复!");
+                }
+
+                SeqNo seqNo = new SeqNo();
+                string tmpId = seqNo.GetBaseSeqNo();
+                sql = $"INSERT INTO TmpInfo (TmpId, TmpNm, Root, LockCount, CrtDate, Crter, EditLock, DCM) VALUES ('{tmpId}', '{templetName}', '0', 0, {DateTime.Now}, '{creater}', 0, 0) ";
+                command.CommandText = sql;
+                try
+                {
+                    result = command.ExecuteNonQuery();
+                }
+                catch (Exception e)
+                {
+                    log.Error(string.Format($"Insert table TmpInfo error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                    DBConnection.CloseConnection(sqlConnection);
+                    throw;
+                }
+
+                if (result == 0)
+                {
+                    log.Error(string.Format($"插入TmpInfo记录数为0\nsql[{sql}]\n"));
+                    DBConnection.CloseConnection(sqlConnection);
+                    throw new Exception("插入TmpInfo记录数为0!");
+                }
+
+
+                //登记数据库表Relation
+                sql = $"INSERT INTO RELATION () VALUES ()";
+
+                //登记数据库表AttrPass
+
             }
             DBConnection.CloseConnection(sqlConnection);
         }

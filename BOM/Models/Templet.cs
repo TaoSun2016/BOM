@@ -8,7 +8,8 @@ namespace BOM.Models
     {
         log4net.ILog log = log4net.LogManager.GetLogger("Templet");
 
-        public void CreateTempletInfor(string templetName, string creater)
+        //新建根物料模板
+        public void CreateTemplet(string templetName, string creater)
         {
             int result = 0;
             string sql = null;
@@ -63,15 +64,19 @@ namespace BOM.Models
             DBConnection.CloseConnection(sqlConnection);
         }
 
-        public void CreateTempletInfor(string refTempletId, string relation, string templetName, string creater)
+        //新建物料信息(非根物料节点,无参考模板)
+        public void CreateTemplet(string parentTempletId, string templetName, string creater)
         {
             int result = 0;
+            int rlSeqNo = -1;
             string sql = null;
 
             SqlConnection sqlConnection = DBConnection.OpenConnection();
+            SqlTransaction sqlTransaction = sqlConnection.BeginTransaction();
             using (SqlCommand command = new SqlCommand())
             {
                 command.Connection = sqlConnection;
+                command.Transaction = sqlTransaction;
                 sql = $"SELECT COUNT(*) FROM TmpInfo WHERE TmpNm = '{templetName}' ";
                 command.CommandText = sql;
                 try
@@ -116,9 +121,179 @@ namespace BOM.Models
 
 
                 //登记数据库表Relation
-                sql = $"INSERT INTO RELATION () VALUES ()";
+
+                //获取Relation.rlSeqNo的值
+                sql = $"SELECT ISNULL(MAX(rlSeqNo),-1) FROM RELATION WHERE TmpId = '{parentTempletId}' and CTmpId = '{tmpId}'";
+                command.CommandText = sql;
+                try
+                {
+                    rlSeqNo = (int)command.ExecuteScalar();
+                }
+                catch (Exception e)
+                {
+                    log.Error(string.Format($"Select Table Relation error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                    DBConnection.CloseConnection(sqlConnection);
+                    throw;
+                }
+                rlSeqNo++;
+
+                //Insert Relation
+                sql = $"INSERT INTO RELATION (TmpId, CTmpId, CTmpNum, LockFlag, CrtDate, Crter, rlSeqNo) VALUES ('{parentTempletId}','{templetName}',0,0,{DateTime.Now},creater,{rlSeqNo})";
+                command.CommandText = sql;
+                try
+                {
+                    result = command.ExecuteNonQuery();
+                }
+                catch (Exception e)
+                {
+                    log.Error(string.Format($"Insert table Relation error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                    sqlTransaction.Rollback();
+                    DBConnection.CloseConnection(sqlConnection);
+                    throw;
+                }
+                if (result == 0)
+                {
+                    log.Error(string.Format($"插入Relation表记录数为0\nsql[{sql}]\n"));
+                    sqlTransaction.Rollback();
+                    DBConnection.CloseConnection(sqlConnection);
+                    throw new Exception("插入Relation表记录数为0!");
+                }
+
 
                 //登记数据库表AttrPass
+                rlSeqNo = -1;
+                sql = $"SELECT ISNULL(MAX(rlSeqNo),-1) FROM AttrPass WHERE TmpId = '{parentTempletId}' and CTmpId = '{tmpId}'";
+                command.CommandText = sql;
+                try
+                {
+                    rlSeqNo = (int)command.ExecuteScalar();
+                }
+                catch (Exception e)
+                {
+                    log.Error(string.Format($"Select AttrPass error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                    DBConnection.CloseConnection(sqlConnection);
+                    throw;
+                }
+                rlSeqNo++;
+
+                sql = $"INSERT INTO AttrPass (TmpId, CTmpId, CAttrId, CAttrValue, CrtDate, Crter, rlSeqNo) VALUES ('{parentTempletId}','{templetName}','_danyl',0,{DateTime.Now},creater,{rlSeqNo})";
+                command.CommandText = sql;
+                try
+                {
+                    result = command.ExecuteNonQuery();
+                }
+                catch (Exception e)
+                {
+                    log.Error(string.Format($"Insert table AttrPass error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                    sqlTransaction.Rollback();
+                    DBConnection.CloseConnection(sqlConnection);
+                    throw;
+                }
+                if (result == 0)
+                {
+                    log.Error(string.Format($"Insert table Attrpass 0 record\nsql[{sql}]\n"));
+                    sqlTransaction.Rollback();
+                    DBConnection.CloseConnection(sqlConnection);
+                    throw new Exception("Insert table Attrpass 0 record!");
+                }
+                sqlTransaction.Commit();
+
+            }
+            DBConnection.CloseConnection(sqlConnection);
+        }
+
+        //新建物料信息(非根物料节点,有参考模板)
+        public void CreateCopiedTemplet(string parentTempletId, string referenceTempletId, string creater)
+        {
+            int result = 0;
+            int rlSeqNo = -1;
+            string sql = null;
+
+            SqlConnection sqlConnection = DBConnection.OpenConnection();
+            SqlTransaction sqlTransaction = sqlConnection.BeginTransaction();
+            using (SqlCommand command = new SqlCommand())
+            {
+                command.Connection = sqlConnection;
+                command.Transaction = sqlTransaction;
+                
+
+                //登记数据库表Relation
+
+                //获取Relation.rlSeqNo的值
+                sql = $"SELECT ISNULL(MAX(rlSeqNo),-1) FROM RELATION WHERE TmpId = '{parentTempletId}' and CTmpId = '{tmpId}'";
+                command.CommandText = sql;
+                try
+                {
+                    rlSeqNo = (int)command.ExecuteScalar();
+                }
+                catch (Exception e)
+                {
+                    log.Error(string.Format($"Select Table Relation error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                    DBConnection.CloseConnection(sqlConnection);
+                    throw;
+                }
+                rlSeqNo++;
+
+                //Insert Relation
+                sql = $"INSERT INTO RELATION (TmpId, CTmpId, CTmpNum, LockFlag, CrtDate, Crter, rlSeqNo) VALUES ('{parentTempletId}','{templetName}',0,0,{DateTime.Now},creater,{rlSeqNo})";
+                command.CommandText = sql;
+                try
+                {
+                    result = command.ExecuteNonQuery();
+                }
+                catch (Exception e)
+                {
+                    log.Error(string.Format($"Insert table Relation error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                    sqlTransaction.Rollback();
+                    DBConnection.CloseConnection(sqlConnection);
+                    throw;
+                }
+                if (result == 0)
+                {
+                    log.Error(string.Format($"插入Relation表记录数为0\nsql[{sql}]\n"));
+                    sqlTransaction.Rollback();
+                    DBConnection.CloseConnection(sqlConnection);
+                    throw new Exception("插入Relation表记录数为0!");
+                }
+
+
+                //登记数据库表AttrPass
+                rlSeqNo = -1;
+                sql = $"SELECT ISNULL(MAX(rlSeqNo),-1) FROM AttrPass WHERE TmpId = '{parentTempletId}' and CTmpId = '{tmpId}'";
+                command.CommandText = sql;
+                try
+                {
+                    rlSeqNo = (int)command.ExecuteScalar();
+                }
+                catch (Exception e)
+                {
+                    log.Error(string.Format($"Select AttrPass error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                    DBConnection.CloseConnection(sqlConnection);
+                    throw;
+                }
+                rlSeqNo++;
+
+                sql = $"INSERT INTO AttrPass (TmpId, CTmpId, CAttrId, CAttrValue, CrtDate, Crter, rlSeqNo) VALUES ('{parentTempletId}','{templetName}','_danyl',0,{DateTime.Now},creater,{rlSeqNo})";
+                command.CommandText = sql;
+                try
+                {
+                    result = command.ExecuteNonQuery();
+                }
+                catch (Exception e)
+                {
+                    log.Error(string.Format($"Insert table AttrPass error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                    sqlTransaction.Rollback();
+                    DBConnection.CloseConnection(sqlConnection);
+                    throw;
+                }
+                if (result == 0)
+                {
+                    log.Error(string.Format($"Insert table Attrpass 0 record\nsql[{sql}]\n"));
+                    sqlTransaction.Rollback();
+                    DBConnection.CloseConnection(sqlConnection);
+                    throw new Exception("Insert table Attrpass 0 record!");
+                }
+                sqlTransaction.Commit();
 
             }
             DBConnection.CloseConnection(sqlConnection);

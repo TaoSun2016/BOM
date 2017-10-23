@@ -401,5 +401,121 @@ namespace BOM.Models
             }
             DBConnection.CloseConnection(sqlConnection);
         }
-    }
+
+        //删除模板节点
+        public void DeleteTemplet(string parentTempletId, string TempletId, int sequenceNo)
+        {
+            int result = 0;
+            string sql = null;
+
+            SqlConnection sqlConnection = DBConnection.OpenConnection();
+            SqlTransaction sqlTransaction = sqlConnection.BeginTransaction();
+            using (SqlCommand command = new SqlCommand())
+            {
+                command.Connection = sqlConnection;
+                command.Transaction = sqlTransaction;
+
+                //Delete AttrPass
+                sql = $"DELETE FROM  AttrPass  where TmpId = '{parentTempletId}' and CTmpId = '{TempletId}' and rlseqno = {sequenceNo}";
+                command.CommandText = sql;
+                try
+                {
+                    result = command.ExecuteNonQuery();
+                }
+                catch (Exception e)
+                {
+                    log.Error(string.Format($"Delete AttrPass error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                    sqlTransaction.Rollback();
+                    DBConnection.CloseConnection(sqlConnection);
+                    throw;
+                }
+                if (result == 0)
+                {
+                    log.Error(string.Format($"Delete Attrpass 0 record\nsql[{sql}]\n"));
+                    sqlTransaction.Rollback();
+                    DBConnection.CloseConnection(sqlConnection);
+                    throw new Exception("Delete Attrpass 0 record!");
+                }
+
+                //Delete Relation
+                sql = $"DELETE FROM  Relation  where TmpId = '{parentTempletId}' and CTmpId = '{TempletId}' and rlseqno = {sequenceNo}";
+                command.CommandText = sql;
+                try
+                {
+                    result = command.ExecuteNonQuery();
+                }
+                catch (Exception e)
+                {
+                    log.Error(string.Format($"Delete Relation error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                    sqlTransaction.Rollback();
+                    DBConnection.CloseConnection(sqlConnection);
+                    throw;
+                }
+                if (result == 0)
+                {
+                    log.Error(string.Format($"Delete Relation 0 record\nsql[{sql}]\n"));
+                    sqlTransaction.Rollback();
+                    DBConnection.CloseConnection(sqlConnection);
+                    throw new Exception("Delete Relation 0 record!");
+                }
+                sqlTransaction.Commit();
+            }
+            DBConnection.CloseConnection(sqlConnection);
+        }
+
+        //锁定模板
+        public void LockTemplet(string templetId)
+        {
+            int result1 = 0;
+            int result2 = 0;
+            int result3 = 0;
+
+            string sql = null;
+
+            SqlConnection sqlConnection = DBConnection.OpenConnection();
+            SqlTransaction sqlTransaction = sqlConnection.BeginTransaction();
+            using (SqlCommand command = new SqlCommand())
+            {
+                command.Connection = sqlConnection;
+                command.Transaction = sqlTransaction;
+
+                try
+                {
+                    sql = $"UPDATE TmpInfo SET LockCount = LockCount+1 WHERE TmpId = '{templetId}'";
+                    command.CommandText = sql;
+                    result1 = command.ExecuteNonQuery();
+
+                    sql = $"UPDATE Relation SET LockFlag = 1 WHERE LockFlag = 0 AND TmpId = '{templetId}'";
+                    command.CommandText = sql;
+                    result2 = command.ExecuteNonQuery();
+
+                    sql = $"INSERT INTO SEQ_NO (IND_KEY, NEXT_NO) VALUES('{templetId}',1)";
+                    command.CommandText = sql;
+                    result3 = command.ExecuteNonQuery();
+                }
+                catch (Exception e)
+                {
+                    log.Error(string.Format($"Lock templet error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                    sqlTransaction.Rollback();
+                    DBConnection.CloseConnection(sqlConnection);
+                    throw;
+                }
+                if (result1 == 0 || result2 == 0 || result3 == 0)
+                {
+                    log.Error(string.Format($"Lock templet error!\nsql[{sql}]\n"));
+                    sqlTransaction.Rollback();
+                    DBConnection.CloseConnection(sqlConnection);
+                    throw new Exception("Lock templet error!!");
+                }
+
+                sql = "SELECT AttrId,AttrTp FROM AttrDefine WHERE TmpId = '{templetId}'";
+
+            }
+        }
+
+        public void BatchProcess()
+        {
+
+        }
+
 }

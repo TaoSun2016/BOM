@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data.SqlClient;
+using System.Text;
 
 namespace BOM.Models
 {
@@ -471,6 +472,7 @@ namespace BOM.Models
             int result3 = 0;
 
             string sql = null;
+            StringBuilder sqlCreate = new StringBuilder();
 
             SqlConnection sqlConnection = DBConnection.OpenConnection();
             SqlTransaction sqlTransaction = sqlConnection.BeginTransaction();
@@ -508,14 +510,50 @@ namespace BOM.Models
                     throw new Exception("Lock templet error!!");
                 }
 
-                sql = "SELECT AttrId,AttrTp FROM AttrDefine WHERE TmpId = '{templetId}'";
+                sql = $"SELECT AttrId,AttrTp FROM AttrDefine WHERE TmpId = '{templetId}'";
+                sqlCreate.Append($"CREATE TABLE [{templetId}] (materielIdentfication varchar (50) COLLATE Chinese_PRC_CI_AS PRIMARY KEY CLUSTERED");
+                command.CommandText = sql;
 
+                using (SqlDataReader sqlDataReader = command.ExecuteReader())
+                {
+                    if (sqlDataReader.HasRows)
+                    {
+                        while (sqlDataReader.Read())
+                        {
+                            sqlCreate.Append(",[").Append(sqlDataReader["AttrId"].ToString().Trim())
+                          .Append((sqlDataReader["AttrTp"].ToString().Trim() == "C") ? "] varchar (50) COLLATE Chinese_PRC_CI_AS" : "] decimal(18,4)");
+                        }
+                        sqlCreate.Append(") ON [PRIMARY]");
+
+                        command.CommandText = sqlCreate.ToString();
+                        try
+                        {
+                            result1 = command.ExecuteNonQuery();
+                        }
+                        catch (Exception e)
+                        {
+                            log.Error(string.Format($"Create table error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                            sqlTransaction.Rollback();
+                            DBConnection.CloseConnection(sqlConnection);
+                            throw;
+                        }
+                        if (result1 == 0)
+                        {
+                            log.Error(string.Format($"Create table error!!\nsql[{sql}]\n"));
+                            sqlTransaction.Rollback();
+                            DBConnection.CloseConnection(sqlConnection);
+                            throw new Exception("Lock templet error!!");
+                        }
+                    }
+                }
+                sqlTransaction.Commit();
             }
+            DBConnection.CloseConnection(sqlConnection);
         }
 
         public void BatchProcess()
         {
 
         }
-
+    }
 }

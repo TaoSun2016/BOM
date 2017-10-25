@@ -195,22 +195,7 @@ namespace BOM.Models
 
 
                 //登记数据库表AttrPass
-                rlSeqNo = -1;
-                sql = $"SELECT ISNULL(MAX(rlSeqNo),-1) FROM AttrPass WHERE TmpId = '{parentTempletId}' and CTmpId = '{tmpId}'";
-                command.CommandText = sql;
-                try
-                {
-                    rlSeqNo = (int)command.ExecuteScalar();
-                }
-                catch (Exception e)
-                {
-                    log.Error(string.Format($"Select AttrPass error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                    sqlTransaction.Rollback();
-                    DBConnection.CloseConnection(sqlConnection);
-                    throw;
-                }
-                rlSeqNo++;
-
+               
                 sql = $"INSERT INTO AttrPass (TmpId, CTmpId, CAttrId, CAttrValue, CrtDate, Crter, rlSeqNo) VALUES ('{parentTempletId}','{templetName}','_danyl',0,{DateTime.Now},creater,{rlSeqNo})";
                 command.CommandText = sql;
                 try
@@ -237,8 +222,8 @@ namespace BOM.Models
             DBConnection.CloseConnection(sqlConnection);
         }
 
-        //新建物料信息(非根物料节点,有参考模板,父模板,新模板)
-        public void CreateCopiedTemplet(string parentTempletId, string referenceTempletId, String NewTmpletId, string NewTmpletName, string creater)
+        //新建物料信息(非根物料节点,有参考模板,父模板)
+        public void CreateCopiedTemplet(string parentTempletId, string referenceTempletId, string creater)
         {
             int result = 0;
             int rlSeqNo = -1;
@@ -251,78 +236,11 @@ namespace BOM.Models
                 command.Connection = sqlConnection;
                 command.Transaction = sqlTransaction;
 
-                //1 赋值模板信息
-                //1.1 insert into AttrPass
-                sql = $"INSERT INTO AttrPass (TmpId, CTmpId, CAttrId, CAttrValue, ValueTp, PAttrId, Gt, Lt, Eq, Excld, Gteq, Lteq, CrtDate, Crter, rlSeqNo) SELECT '{NewTmpletId}', CTmpId, CAttrId, CAttrValue, ValueTp, PAttrId, Gt, Lt, Eq, Excld, Gteq, Lteq, {DateTime.Now}, '{creater}', rlSeqNo FROM attrpass WHERE TmpId='{referenceTempletId}'";
-                command.CommandText = sql;
-                try
-                {
-                    result = command.ExecuteNonQuery();
-                }
-                catch (Exception e)
-                {
-                    log.Error(string.Format($"Insert table AttrPass error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                    sqlTransaction.Rollback();
-                    DBConnection.CloseConnection(sqlConnection);
-                    throw;
-                }
-                if (result == 0)
-                {
-                    log.Error(string.Format($"Insert table Attrpass 0 record\nsql[{sql}]\n"));
-                    sqlTransaction.Rollback();
-                    DBConnection.CloseConnection(sqlConnection);
-                    throw new Exception("Insert table Attrpass 0 record!");
-                }
-
-                //1.2 insert into AttrDefine
-                sql = $"INSERT INTO AttrDefine (TmpId, CTmpId, CAttrId, CAttrValue, ValueTp, CrtDate, Crter) SELECT '{NewTmpletId}', CTmpId, CAttrId, CAttrValue, ValueTp, {DateTime.Now}, '{creater}', FROM AttrDefine WHERE TmpId='{referenceTempletId}'";
-                command.CommandText = sql;
-                try
-                {
-                    result = command.ExecuteNonQuery();
-                }
-                catch (Exception e)
-                {
-                    log.Error(string.Format($"Insert table AttrDefine error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                    sqlTransaction.Rollback();
-                    DBConnection.CloseConnection(sqlConnection);
-                    throw;
-                }
-                if (result == 0)
-                {
-                    log.Error(string.Format($"Insert table AttrDefine 0 record\nsql[{sql}]\n"));
-                    sqlTransaction.Rollback();
-                    DBConnection.CloseConnection(sqlConnection);
-                    throw new Exception("Insert table AttrDefine 0 record!");
-                }
-
-                //1.3 insert into Relation
-                sql = $"INSERT INTO Relation (TmpId, CTmpId, CTmpNum, LockFlag, rlSeqNo CrtDate, Crter) SELECT '{NewTmpletId}', CTmpId, CTmpNum, 0, rlSeqNo, {DateTime.Now}, '{creater}', FROM Relation WHERE TmpId='{referenceTempletId}'";
-                command.CommandText = sql;
-                try
-                {
-                    result = command.ExecuteNonQuery();
-                }
-                catch (Exception e)
-                {
-                    log.Error(string.Format($"Insert table Relation error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                    sqlTransaction.Rollback();
-                    DBConnection.CloseConnection(sqlConnection);
-                    throw;
-                }
-                if (result == 0)
-                {
-                    log.Error(string.Format($"Insert table Relation 0 record\nsql[{sql}]\n"));
-                    sqlTransaction.Rollback();
-                    DBConnection.CloseConnection(sqlConnection);
-                    throw new Exception("Insert table Relation 0 record!");
-                }
-
-
+               
                 //登记数据库表Relation
 
                 //获取Relation.rlSeqNo的值
-                sql = $"SELECT ISNULL(MAX(rlSeqNo),-1) FROM RELATION WHERE TmpId = '{parentTempletId}' and CTmpId = '{NewTmpletId}'";
+                sql = $"SELECT ISNULL(MAX(rlSeqNo),-1) FROM RELATION WHERE TmpId = '{parentTempletId}' and CTmpId = '{referenceTempletId}'";
                 command.CommandText = sql;
                 try
                 {
@@ -338,7 +256,7 @@ namespace BOM.Models
                 rlSeqNo++;
 
                 //Insert Relation
-                sql = $"INSERT INTO RELATION (TmpId, CTmpId, CTmpNum, LockFlag, CrtDate, Crter, rlSeqNo) VALUES ('{parentTempletId}', '{NewTmpletId}', 1, 0, {DateTime.Now}, creater, {rlSeqNo})";
+                sql = $"INSERT INTO RELATION (TmpId, CTmpId, CTmpNum, LockFlag, CrtDate, Crter, rlSeqNo) VALUES ('{parentTempletId}', '{referenceTempletId}', 1, 0, {DateTime.Now}, creater, {rlSeqNo})";
                 command.CommandText = sql;
                 try
                 {
@@ -361,23 +279,7 @@ namespace BOM.Models
 
 
                 //登记数据库表AttrPass
-                rlSeqNo = -1;
-                sql = $"SELECT ISNULL(MAX(rlSeqNo),-1) FROM AttrPass WHERE TmpId = '{parentTempletId}' and CTmpId = '{NewTmpletId}'";
-                command.CommandText = sql;
-                try
-                {
-                    rlSeqNo = (int)command.ExecuteScalar();
-                }
-                catch (Exception e)
-                {
-                    log.Error(string.Format($"Select AttrPass error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                    sqlTransaction.Rollback();
-                    DBConnection.CloseConnection(sqlConnection);
-                    throw;
-                }
-                rlSeqNo++;
-
-                sql = $"INSERT INTO AttrPass (TmpId, CTmpId, CAttrId, CAttrValue, CrtDate, Crter, rlSeqNo) VALUES ('{parentTempletId}', '{NewTmpletId}', '_danyl', 0, {DateTime.Now}, creater,{rlSeqNo})";
+                sql = $"INSERT INTO AttrPass (TmpId, CTmpId, CAttrId, CAttrValue, CrtDate, Crter, rlSeqNo) VALUES ('{parentTempletId}', '{referenceTempletId}', '_danyl', 0, {DateTime.Now}, creater,{rlSeqNo})";
                 command.CommandText = sql;
                 try
                 {
@@ -470,6 +372,7 @@ namespace BOM.Models
             int result1 = 0;
             int result2 = 0;
             int result3 = 0;
+            int result4 = 0;
 
             string sql = null;
             StringBuilder sqlCreate = new StringBuilder();
@@ -491,9 +394,13 @@ namespace BOM.Models
                     command.CommandText = sql;
                     result2 = command.ExecuteNonQuery();
 
-                    sql = $"INSERT INTO SEQ_NO (IND_KEY, NEXT_NO) VALUES('{templetId}',1)";
+                    sql = $"UPDATE AttrDefine SET LockFlag = 1 WHERE LockFlag = 0 AND TmpId = '{templetId}'";
                     command.CommandText = sql;
                     result3 = command.ExecuteNonQuery();
+
+                    sql = $"INSERT INTO SEQ_NO (IND_KEY, NEXT_NO) VALUES('{templetId}',1)";
+                    command.CommandText = sql;
+                    result4 = command.ExecuteNonQuery();
                 }
                 catch (Exception e)
                 {
@@ -502,7 +409,7 @@ namespace BOM.Models
                     DBConnection.CloseConnection(sqlConnection);
                     throw;
                 }
-                if (result1 == 0 || result2 == 0 || result3 == 0)
+                if (result4 == 0)//其它result可能存在等于0的情况,不作例外处理
                 {
                     log.Error(string.Format($"Lock templet error!\nsql[{sql}]\n"));
                     sqlTransaction.Rollback();

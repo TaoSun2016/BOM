@@ -476,6 +476,7 @@ namespace BOM.Models
                             sqlCreate.Append(",[").Append(sqlDataReader["AttrId"].ToString().Trim())
                           .Append((sqlDataReader["AttrTp"].ToString().Trim() == "C") ? "] varchar (50) COLLATE Chinese_PRC_CI_AS" : "] decimal(18,4)");
                         }
+                        sqlDataReader.Close();
                         sqlCreate.Append(") ON [PRIMARY]");
                         sql = sqlCreate.ToString();
                         command.CommandText = sql;

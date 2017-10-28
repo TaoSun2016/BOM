@@ -54,17 +54,7 @@ namespace BOM.Models
                         sqlTransaction.Rollback();
                         DBConnection.CloseConnection(sqlConnection);
                         throw new Exception("update table seq_no error!");
-                    }
-
-                    sql = $"INSERT INTO SEQ_NO VALUES ('{seqNo}',0)";
-                    command.CommandText = sql;
-                    result = command.ExecuteNonQuery();
-                    if (result == 0)
-                    {
-                        sqlTransaction.Rollback();
-                        DBConnection.CloseConnection(sqlConnection);
-                        throw new Exception("insert table seq_no error!");
-                    }
+                    }                    
                 }
                 catch
                 {
@@ -86,9 +76,10 @@ namespace BOM.Models
 
             SqlConnection sqlConnection = DBConnection.OpenConnection();
             string sql = $"SELECT * FROM SEQ_NO WHERE Ind_Key = '{tmpId}'";
-
+            SqlTransaction sqlTransaction = sqlConnection.BeginTransaction();
             using (SqlCommand command = new SqlCommand(sql, sqlConnection))
             {
+                command.Transaction = sqlTransaction;
                 SqlDataReader dataReader = command.ExecuteReader();
 
                 if (dataReader.HasRows)
@@ -122,7 +113,7 @@ namespace BOM.Models
                 }
 
             }
-
+            sqlTransaction.Commit();
             DBConnection.CloseConnection(sqlConnection);
             return seqNo;
         }

@@ -78,5 +78,49 @@ namespace BOM.Controllers
             }
         }
 
+        [HttpPost]
+        [Route("Delete")]
+        public void DeleteTemplet(long parentTempletId, long TempletId, int rlSeqNo)
+        {
+            Templet templet = new Templet();
+            try
+            {
+                templet.DeleteTemplet( parentTempletId, TempletId, rlSeqNo);
+            }
+            catch (Exception e)
+            {
+                string logMessage = string.Format($"Delete templet error!\n {e.StackTrace}");
+                log.Error(logMessage);
+                var responseMessge = new HttpResponseMessage(HttpStatusCode.InternalServerError)
+                {
+                    Content = new StringContent(logMessage),
+                    ReasonPhrase = "Delete templet ERROR"
+                };
+                throw new HttpResponseException(responseMessge);
+            }
+        }
+
+
+        [HttpPost]
+        [Route("Lock")]
+        public void LockTemplet(long templetId)
+        {
+            Templet templet = new Templet();
+            try
+            {
+                templet.LockTemplet(templetId);
+            }
+            catch (Exception e)
+            {
+                string logMessage = string.Format($"Lock templet error!\n {e.StackTrace}");
+                log.Error(logMessage);
+                var responseMessge = new HttpResponseMessage(HttpStatusCode.InternalServerError)
+                {
+                    Content = new StringContent(logMessage),
+                    ReasonPhrase = "Lock templet error"
+                };
+                throw new HttpResponseException(responseMessge);
+            }
+        }
     }
 }

@@ -352,7 +352,7 @@ namespace BOM.Models
         }
 
         //É¾³ýÄ£°å½Úµã
-        public void DeleteTemplet(long parentTempletId, long TempletId, int sequenceNo)
+        public void DeleteTemplet(long parentTempletId, long TempletId, int rlSeqNo)
         {
             int result = 0;
             string sql = null;
@@ -365,7 +365,7 @@ namespace BOM.Models
                 command.Transaction = sqlTransaction;
 
                 //Delete AttrPass
-                sql = $"DELETE FROM  AttrPass  where TmpId = {parentTempletId} and CTmpId = {TempletId} and rlseqno = {sequenceNo}";
+                sql = $"DELETE FROM  AttrPass  where TmpId = {parentTempletId} and CTmpId = {TempletId} and rlseqno = {rlSeqNo}";
                 command.CommandText = sql;
                 try
                 {
@@ -387,7 +387,7 @@ namespace BOM.Models
                 }
 
                 //Delete Relation
-                sql = $"DELETE FROM  Relation  where TmpId = {parentTempletId} and CTmpId = {TempletId} and rlseqno = {sequenceNo}";
+                sql = $"DELETE FROM  Relation  where TmpId = {parentTempletId} and CTmpId = {TempletId} and rlseqno = {rlSeqNo}";
                 command.CommandText = sql;
                 try
                 {
@@ -477,8 +477,8 @@ namespace BOM.Models
                           .Append((sqlDataReader["AttrTp"].ToString().Trim() == "C") ? "] varchar (50) COLLATE Chinese_PRC_CI_AS" : "] decimal(18,4)");
                         }
                         sqlCreate.Append(") ON [PRIMARY]");
-
-                        command.CommandText = sqlCreate.ToString();
+                        sql = sqlCreate.ToString();
+                        command.CommandText = sql;
                         try
                         {
                             result1 = command.ExecuteNonQuery();

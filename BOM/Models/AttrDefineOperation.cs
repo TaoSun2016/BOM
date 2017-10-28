@@ -16,7 +16,7 @@ namespace BOM.Models
             SqlConnection sqlConnection = DBConnection.OpenConnection();
 
             string crtDate = DateTime.Now.ToString("yyyyMMdd HH:mm:ss");
-            string sql = "INSERT INTO AttrDefine " + $"(TmpId, AttrId, AttrNm, AttrTp,CrtDate, Crter) Values ('{attrDefine.TmpId}','{attrDefine.AttrId}', '{attrDefine.AttrNm}', '{attrDefine.AttrTp}', '{crtDate}','{attrDefine.Crter}')";
+            string sql = "INSERT INTO AttrDefine " + $"(TmpId, AttrId, AttrNm, AttrTp,CrtDate, Crter) Values ({attrDefine.TmpId},'{attrDefine.AttrId}', '{attrDefine.AttrNm}', '{attrDefine.AttrTp}', '{crtDate}','{attrDefine.Crter}')";
             using (SqlCommand command = new SqlCommand(sql, sqlConnection))
             {
                 try
@@ -32,10 +32,10 @@ namespace BOM.Models
             }
             DBConnection.CloseConnection(sqlConnection);
         }
-        public void Delete(string tmpId, string attrId, string attrNm, string attrTp)
+        public void Delete(long tmpId, string attrId, string attrNm, string attrTp)
         {
             SqlConnection sqlConnection = DBConnection.OpenConnection();
-            string sql = $"DELETE FROM AttrDefine WHERE TmpId = '{tmpId}' AND AttrId='{attrId}' AND AttrNm='{attrNm}' AND AttrTp='{attrTp}'";
+            string sql = $"DELETE FROM AttrDefine WHERE TmpId = {tmpId} AND AttrId='{attrId}' AND AttrNm='{attrNm}' AND AttrTp='{attrTp}'";
             using (SqlCommand command = new SqlCommand(sql, sqlConnection))
             {
                 try
@@ -52,12 +52,12 @@ namespace BOM.Models
 
         }
 
-        public void Update(string oldTmpId, string oldAttrId, string oldAttrNm, string oldAttrTp, string tmpId, string attrId, string attrNm, string attrTp, string lstupdter)
+        public void Update(long oldTmpId, string oldAttrId, string oldAttrNm, string oldAttrTp, long tmpId, string attrId, string attrNm, string attrTp, string lstupdter)
         {
             SqlConnection sqlConnection = DBConnection.OpenConnection();
             string updtDate = DateTime.Now.ToString("yyyyMMdd HH:mm:ss");
 
-            string sql = $"UPDATE AttrDefine SET TmpId = '{tmpId}' , AttrId='{attrId}' , AttrNm='{attrNm}' , AttrTp='{attrTp}' , LstUpdtDate='{updtDate}' , LstUpdter='{lstupdter}'  WHERE TmpId = '{oldTmpId}' AND AttrId='{oldAttrId}' AND AttrNm='{oldAttrNm}' AND AttrTp='{oldAttrTp}' AND LockFlag='0'";
+            string sql = $"UPDATE AttrDefine SET TmpId = {tmpId} , AttrId='{attrId}' , AttrNm='{attrNm}' , AttrTp='{attrTp}' , LstUpdtDate='{updtDate}' , LstUpdter='{lstupdter}'  WHERE TmpId = {oldTmpId} AND AttrId='{oldAttrId}' AND AttrNm='{oldAttrNm}' AND AttrTp='{oldAttrTp}' AND LockFlag='0'";
 
             using (SqlCommand command = new SqlCommand(sql, sqlConnection))
             {
@@ -66,12 +66,12 @@ namespace BOM.Models
             DBConnection.CloseConnection(sqlConnection);
         }
 
-        public void Lock( string tmpId, string attrId, string attrNm, string attrTp, int lockFlag, string updter)
+        public void Lock( long tmpId, string attrId, string attrNm, string attrTp, int lockFlag, string updter)
         {
             SqlConnection sqlConnection = DBConnection.OpenConnection();
             string updtDate = DateTime.Now.ToString("yyyyMMdd HH:mm:ss");
 
-            string sql = $"UPDATE AttrDefine SET LockFlag = '{lockFlag}' WHERE TmpId = '{tmpId}' AND AttrId='{attrId}' AND AttrNm='{attrNm}' AND AttrTp='{attrTp}'";
+            string sql = $"UPDATE AttrDefine SET LockFlag = '{lockFlag}' WHERE TmpId = {tmpId} AND AttrId='{attrId}' AND AttrNm='{attrNm}' AND AttrTp='{attrTp}'";
 
             using (SqlCommand command = new SqlCommand(sql, sqlConnection))
             {
@@ -79,7 +79,7 @@ namespace BOM.Models
             }
             DBConnection.CloseConnection(sqlConnection);
         }
-        public List<AttrDefine> Query(string tmpId = null, string attrId = null, string attrNm = null, string attrTp = null)
+        public List<AttrDefine> Query(long? tmpId = null, string attrId = null, string attrNm = null, string attrTp = null)
         {
             SqlConnection sqlConnection = DBConnection.OpenConnection();
             
@@ -88,7 +88,7 @@ namespace BOM.Models
             string sql = "SELECT * FROM AttrDefine WHERE 0 = 0";
             if (tmpId != null)
             {
-                sql += $" AND TmpId = '{tmpId}'";
+                sql += $" AND TmpId = {tmpId}";
             }
             if (attrId != null)
             {
@@ -109,7 +109,7 @@ namespace BOM.Models
                 {
                     list.Add(new AttrDefine
                     {
-                        TmpId = dataReader["TmpId"].ToString(),
+                        TmpId = (long)dataReader["TmpId"],
                         AttrId = dataReader["AttrId"].ToString(),
                         AttrNm = dataReader["AttrNm"].ToString(),
                         AttrTp = dataReader["AttrTp"].ToString(),
@@ -143,13 +143,13 @@ namespace BOM.Models
             
         }
 
-        public AttrDefine QueryOne(string tmpId, string attrId, string attrNm, string attrTp)
+        public AttrDefine QueryOne(long tmpId, string attrId, string attrNm, string attrTp)
         {
             
             SqlConnection sqlConnection = DBConnection.OpenConnection();
 
             string sql = "SELECT * FROM AttrDefine WHERE 0 = 0"
-                       + $" AND TmpId = '{tmpId}'"            
+                       + $" AND TmpId = {tmpId}"            
                        + $" AND AttrId = '{attrId}'"
                        + $" AND AttrNm = '{attrNm}'"
                        + $" AND AttrTp = '{attrTp}'";
@@ -164,7 +164,7 @@ namespace BOM.Models
                     dataReader.Read();
                     attrDefine = new AttrDefine
                     {
-                        TmpId = dataReader["TmpId"].ToString(),
+                        TmpId = (long)dataReader["TmpId"],
                         AttrId = dataReader["AttrId"].ToString(),
                         AttrNm = dataReader["AttrNm"].ToString(),
                         AttrTp = dataReader["AttrTp"].ToString(),

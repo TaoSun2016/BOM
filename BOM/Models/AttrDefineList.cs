@@ -26,15 +26,15 @@ namespace BOM.Models
                     {
                         case 'I':
                             DateTime crtDate = DateTime.Now;
-                            sql = $"INSERT INTO AttrDefine (TmpId, AttrId, AttrNm, AttrTp,CrtDate, Crter) Values ('{attribute.TmpId}','{attribute.AttrId}', '{attribute.AttrNm}', '{attribute.AttrTp}', '{crtDate}','{attribute.Crter}')";
+                            sql = $"INSERT INTO AttrDefine (TmpId, AttrId, AttrNm, AttrTp,CrtDate, Crter) Values ({attribute.TmpId},'{attribute.AttrId}', '{attribute.AttrNm}', '{attribute.AttrTp}', '{crtDate}','{attribute.Crter}')";
                             break;
                         case 'U':
                             DateTime updtDate = DateTime.Now;
-                            sql = $"UPDATE AttrDefine SET TmpId = '{attribute.TmpId}' , AttrId='{attribute.AttrId}' , AttrNm='{attribute.AttrNm}' , AttrTp='{attribute.AttrTp}' , LstUpdtDate='{updtDate}' , LstUpdter='{attribute.LstUpdter}'  WHERE TmpId = '{attribute.OrigTmpId}' AND AttrId='{attribute.OrigAttrId}' AND AttrNm='{attribute.OrigAttrNm}' AND AttrTp='{attribute.OrigAttrTp}' AND LockFlag='0'";
+                            sql = $"UPDATE AttrDefine SET TmpId = {attribute.TmpId} , AttrId='{attribute.AttrId}' , AttrNm='{attribute.AttrNm}' , AttrTp='{attribute.AttrTp}' , LstUpdtDate='{updtDate}' , LstUpdter='{attribute.LstUpdter}'  WHERE TmpId = '{attribute.OrigTmpId}' AND AttrId='{attribute.OrigAttrId}' AND AttrNm='{attribute.OrigAttrNm}' AND AttrTp='{attribute.OrigAttrTp}' AND LockFlag='0'";
 
                             break;
                         case 'D':
-                            sql = $"DELETE FROM AttrDefine WHERE TmpId = '{attribute.TmpId}' AND AttrId='{attribute.AttrId}' AND AttrNm='{attribute.AttrNm}' AND AttrTp='{attribute.AttrTp}'";
+                            sql = $"DELETE FROM AttrDefine WHERE TmpId = {attribute.TmpId} AND AttrId='{attribute.AttrId}' AND AttrNm='{attribute.AttrNm}' AND AttrTp='{attribute.AttrTp}'";
                             break;
                         default:
                             log.Error(string.Format($"数据操作选项错误!\nOption[{attribute.Option}]"));

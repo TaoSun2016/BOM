@@ -5,11 +5,11 @@ namespace BOM.Models
     {
         //I:Insert U:Update D:Delete
         public char Option { get; set; }
-        public string OrigTmpId { get; set; }
+        public long OrigTmpId { get; set; }
         public string OrigAttrId { get; set; }
         public string OrigAttrNm { get; set; }
         public string OrigAttrTp { get; set; }
-        public string TmpId { get; set; }
+        public long TmpId { get; set; }
         public string AttrId { get; set; }
         public string AttrNm { get; set; }
         public string AttrTp { get; set; }

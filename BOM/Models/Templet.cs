@@ -9,6 +9,50 @@ namespace BOM.Models
     {
         log4net.ILog log = log4net.LogManager.GetLogger("Templet");
 
+        //public string GetTmpId(SqlConnection connection,SqlCommand command)
+        //{
+        //    int result = 0;
+        //    long tempSeqNo = 0;
+        //    string seqNo = null;
+        //    string sql = @"SELECT * FROM SEQ_NO WHERE Ind_Key = '0'";
+        //    SqlDataReader dataReader = command.ExecuteReader();
+
+        //    if (dataReader.HasRows)
+        //    {
+        //        dataReader.Read();
+
+        //        tempSeqNo = (long)dataReader["NEXT_NO"];
+
+        //        dataReader.Close();
+
+        //        seqNo = Convert.ToString(tempSeqNo, 8) + "9";
+        //        tempSeqNo += 1;
+        //        sql = $"UPDATE SEQ_NO SET NEXT_NO = {tempSeqNo} WHERE IND_KEY = '0'";
+        //    }
+        //    else
+        //    {
+        //        log.Error(string.Format($"Select Seq_No error\nsql[{sql}]\n"));
+        //        dataReader.Close();
+        //        throw new Exception("There is no base parameter!");
+        //    }
+
+        //    try
+        //    {
+        //        command.CommandText = sql;
+        //        result = command.ExecuteNonQuery();
+        //        if (result == 0)
+        //        {
+        //            log.Error(string.Format($"Update Seq_No 0 record\nsql[{sql}]\n"));
+        //            throw new Exception("update table seq_no error!");
+        //        }
+        //    }
+        //    catch (Exception e)
+        //    {
+        //        log.Error(string.Format($"Update Seq_No error\nsql[{sql}][{e.StackTrace}]\n"));
+        //        throw;
+        //    }
+        //    return seqNo;
+        //}
         //新建根物料模板
         public void CreateTemplet(string templetName, string creater)
         {
@@ -46,7 +90,8 @@ namespace BOM.Models
                 //登记模板信息
                 SeqNo seqNo = new SeqNo();
                 string tmpId = seqNo.GetBaseSeqNo();
-                sql = $"INSERT INTO TmpInfo (TmpId, TmpNm, Root, LockCount, CrtDate, Crter, EditLock, DCM) VALUES ('{tmpId}', '{templetName}', '0', 0, {DateTime.Now}, '{creater}', 0, 0) ";
+                
+                sql = $"INSERT INTO TmpInfo (TmpId, TmpNm, Root, LockCount, CrtDate, Crter, EditLock, DCM) VALUES ({tmpId}, '{templetName}', '0', 0, '{DateTime.Now}', '{creater}', 0, 0) ";
                 command.CommandText = sql;
                 try
                 {
@@ -69,7 +114,7 @@ namespace BOM.Models
                 }
 
                 //登记根物料模板表Relation,TmpId='99',旧系统为'root'
-                sql = $"INSERT INTO Relation (TmpId, CTmpId, LockFlag, CrtDate, Crter, rlSeqNo) VALUES ('99', '{tmpId}', 0,  {DateTime.Now}, '{creater}', 0) ";
+                sql = $"INSERT INTO Relation (TmpId, CTmpId, LockFlag, CrtDate, Crter, rlSeqNo) VALUES (99, {tmpId}, 0,  '{DateTime.Now}', '{creater}', 0) ";
                 command.CommandText = sql;
                 try
                 {
@@ -91,11 +136,12 @@ namespace BOM.Models
                     throw new Exception("Insert table Relation 0 record!");
                 }
             }
+            sqlTransaction.Commit();
             DBConnection.CloseConnection(sqlConnection);
         }
 
         //新建物料信息(非根物料节点,无参考模板,上送父模板ID和新模板名称)
-        public void CreateTemplet(string parentTempletId, string templetName, string creater)
+        public void CreateTemplet(long parentTempletId, string templetName, string creater)
         {
             int result = 0;
             int rlSeqNo = -1;
@@ -132,7 +178,7 @@ namespace BOM.Models
                 //登记新模板信息
                 SeqNo seqNo = new SeqNo();
                 string tmpId = seqNo.GetBaseSeqNo();
-                sql = $"INSERT INTO TmpInfo (TmpId, TmpNm, Root, LockCount, CrtDate, Crter, EditLock, DCM) VALUES ('{tmpId}', '{templetName}', '0', 0, {DateTime.Now}, '{creater}', 0, 0) ";
+                sql = $"INSERT INTO TmpInfo (TmpId, TmpNm, Root, LockCount, CrtDate, Crter, EditLock, DCM) VALUES ({tmpId}, '{templetName}', '0', 0, '{DateTime.Now}', '{creater}', 0, 0) ";
                 command.CommandText = sql;
                 try
                 {
@@ -157,7 +203,7 @@ namespace BOM.Models
 
                 //登记父子模板关系表Relation
                 //获取Relation.rlSeqNo的值
-                sql = $"SELECT ISNULL(MAX(rlSeqNo),-1) FROM RELATION WHERE TmpId = '{parentTempletId}' and CTmpId = '{tmpId}'";
+                sql = $"SELECT ISNULL(MAX(rlSeqNo),-1) FROM RELATION WHERE TmpId = {parentTempletId} and CTmpId = {tmpId}";
                 command.CommandText = sql;
                 try
                 {
@@ -172,7 +218,7 @@ namespace BOM.Models
                 rlSeqNo++;
 
                 //Insert Relation
-                sql = $"INSERT INTO RELATION (TmpId, CTmpId, CTmpNum, LockFlag, CrtDate, Crter, rlSeqNo) VALUES ('{parentTempletId}', '{tmpId}', 0, 0, {DateTime.Now}, creater,{rlSeqNo})";
+                sql = $"INSERT INTO RELATION (TmpId, CTmpId, CTmpNum, LockFlag, CrtDate, Crter, rlSeqNo) VALUES ({parentTempletId}, {tmpId}, 0, 0, '{DateTime.Now}', '{creater}',{rlSeqNo})";
                 command.CommandText = sql;
                 try
                 {
@@ -196,7 +242,7 @@ namespace BOM.Models
 
                 //登记数据库表AttrPass
                
-                sql = $"INSERT INTO AttrPass (TmpId, CTmpId, CAttrId, CAttrValue, CrtDate, Crter, rlSeqNo) VALUES ('{parentTempletId}','{templetName}','_danyl',0,{DateTime.Now},creater,{rlSeqNo})";
+                sql = $"INSERT INTO AttrPass (TmpId, CTmpId, CAttrId, CAttrValue, ValueTp, PAttrId, Gt, Lt, Eq, Excld, Gteq, Lteq, CrtDate, Crter, rlSeqNo) VALUES ({parentTempletId},{tmpId},'_danyl', 0, '', '', '', '', '', '', '', '', '{DateTime.Now}','{creater}',{rlSeqNo})";
                 command.CommandText = sql;
                 try
                 {
@@ -223,7 +269,7 @@ namespace BOM.Models
         }
 
         //新建物料信息(非根物料节点,有参考模板,父模板)
-        public void CreateCopiedTemplet(string parentTempletId, string referenceTempletId, string creater)
+        public void CreateCopiedTemplet(long parentTempletId, long referenceTempletId, string creater)
         {
             int result = 0;
             int rlSeqNo = -1;
@@ -240,7 +286,7 @@ namespace BOM.Models
                 //登记数据库表Relation
 
                 //获取Relation.rlSeqNo的值
-                sql = $"SELECT ISNULL(MAX(rlSeqNo),-1) FROM RELATION WHERE TmpId = '{parentTempletId}' and CTmpId = '{referenceTempletId}'";
+                sql = $"SELECT ISNULL(MAX(rlSeqNo),-1) FROM RELATION WHERE TmpId = {parentTempletId} and CTmpId = {referenceTempletId}";
                 command.CommandText = sql;
                 try
                 {
@@ -256,7 +302,7 @@ namespace BOM.Models
                 rlSeqNo++;
 
                 //Insert Relation
-                sql = $"INSERT INTO RELATION (TmpId, CTmpId, CTmpNum, LockFlag, CrtDate, Crter, rlSeqNo) VALUES ('{parentTempletId}', '{referenceTempletId}', 1, 0, {DateTime.Now}, creater, {rlSeqNo})";
+                sql = $"INSERT INTO RELATION (TmpId, CTmpId, CTmpNum, LockFlag, CrtDate, Crter, rlSeqNo) VALUES ({parentTempletId}, {referenceTempletId}, 1, 0, '{DateTime.Now}', '{creater}', {rlSeqNo})";
                 command.CommandText = sql;
                 try
                 {
@@ -279,7 +325,7 @@ namespace BOM.Models
 
 
                 //登记数据库表AttrPass
-                sql = $"INSERT INTO AttrPass (TmpId, CTmpId, CAttrId, CAttrValue, CrtDate, Crter, rlSeqNo) VALUES ('{parentTempletId}', '{referenceTempletId}', '_danyl', 0, {DateTime.Now}, creater,{rlSeqNo})";
+                sql = $"INSERT INTO AttrPass (TmpId, CTmpId, CAttrId, CAttrValue, ValueTp, PAttrId, Gt, Lt, Eq, Excld, Gteq, Lteq, CrtDate, Crter, rlSeqNo) VALUES ({parentTempletId}, {referenceTempletId}, '_danyl', 0, '', '', '', '', '', '', '', '', '{DateTime.Now}', '{creater}',{rlSeqNo})";
                 command.CommandText = sql;
                 try
                 {
@@ -306,7 +352,7 @@ namespace BOM.Models
         }
 
         //删除模板节点
-        public void DeleteTemplet(string parentTempletId, string TempletId, int sequenceNo)
+        public void DeleteTemplet(long parentTempletId, long TempletId, int sequenceNo)
         {
             int result = 0;
             string sql = null;
@@ -319,7 +365,7 @@ namespace BOM.Models
                 command.Transaction = sqlTransaction;
 
                 //Delete AttrPass
-                sql = $"DELETE FROM  AttrPass  where TmpId = '{parentTempletId}' and CTmpId = '{TempletId}' and rlseqno = {sequenceNo}";
+                sql = $"DELETE FROM  AttrPass  where TmpId = {parentTempletId} and CTmpId = {TempletId} and rlseqno = {sequenceNo}";
                 command.CommandText = sql;
                 try
                 {
@@ -341,7 +387,7 @@ namespace BOM.Models
                 }
 
                 //Delete Relation
-                sql = $"DELETE FROM  Relation  where TmpId = '{parentTempletId}' and CTmpId = '{TempletId}' and rlseqno = {sequenceNo}";
+                sql = $"DELETE FROM  Relation  where TmpId = {parentTempletId} and CTmpId = {TempletId} and rlseqno = {sequenceNo}";
                 command.CommandText = sql;
                 try
                 {
@@ -367,7 +413,7 @@ namespace BOM.Models
         }
 
         //锁定模板
-        public void LockTemplet(string templetId)
+        public void LockTemplet(long templetId)
         {
             int result1 = 0;
             int result2 = 0;
@@ -386,19 +432,19 @@ namespace BOM.Models
 
                 try
                 {
-                    sql = $"UPDATE TmpInfo SET LockCount = LockCount+1 WHERE TmpId = '{templetId}'";
+                    sql = $"UPDATE TmpInfo SET LockCount = LockCount+1 WHERE TmpId = {templetId}";
                     command.CommandText = sql;
                     result1 = command.ExecuteNonQuery();
 
-                    sql = $"UPDATE Relation SET LockFlag = 1 WHERE LockFlag = 0 AND TmpId = '{templetId}'";
+                    sql = $"UPDATE Relation SET LockFlag = 1 WHERE LockFlag = 0 AND TmpId = {templetId}";
                     command.CommandText = sql;
                     result2 = command.ExecuteNonQuery();
 
-                    sql = $"UPDATE AttrDefine SET LockFlag = 1 WHERE LockFlag = 0 AND TmpId = '{templetId}'";
+                    sql = $"UPDATE AttrDefine SET LockFlag = 1 WHERE LockFlag = 0 AND TmpId = {templetId}";
                     command.CommandText = sql;
                     result3 = command.ExecuteNonQuery();
 
-                    sql = $"INSERT INTO SEQ_NO (IND_KEY, NEXT_NO) VALUES('{templetId}',1)";
+                    sql = $"INSERT INTO SEQ_NO (IND_KEY, NEXT_NO) VALUES({templetId},1)";
                     command.CommandText = sql;
                     result4 = command.ExecuteNonQuery();
                 }
@@ -417,8 +463,8 @@ namespace BOM.Models
                     throw new Exception("Lock templet error!!");
                 }
 
-                sql = $"SELECT AttrId,AttrTp FROM AttrDefine WHERE TmpId = '{templetId}'";
-                sqlCreate.Append($"CREATE TABLE [{templetId}] (materielIdentfication varchar (50) COLLATE Chinese_PRC_CI_AS PRIMARY KEY CLUSTERED");
+                sql = $"SELECT AttrId,AttrTp FROM AttrDefine WHERE TmpId = {templetId}";
+                sqlCreate.Append($"CREATE TABLE [{templetId}] (materielIdentfication bigint PRIMARY KEY CLUSTERED");
                 command.CommandText = sql;
 
                 using (SqlDataReader sqlDataReader = command.ExecuteReader())

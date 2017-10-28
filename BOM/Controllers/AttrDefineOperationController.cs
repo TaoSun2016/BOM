@@ -27,7 +27,7 @@ namespace BOM.Controllers
 
         [HttpGet]
         [Route("GetOne")]
-        public AttrDefine GetOne(string tmpId, string attrId, string attrNm, string attrTp)
+        public AttrDefine GetOne(long tmpId, string attrId, string attrNm, string attrTp)
         {
             return operation.QueryOne( tmpId,  attrId,  attrNm,  attrTp);
         }
@@ -45,14 +45,14 @@ namespace BOM.Controllers
 
         [HttpPut]
         [Route("Update")]
-        public void Put(string oldTmpId, string oldAttrId, string oldAttrNm, string oldAttrTp, AttrDefine attrDefine)
+        public void Put(long oldTmpId, string oldAttrId, string oldAttrNm, string oldAttrTp, AttrDefine attrDefine)
         {
             operation.Update(oldTmpId,  oldAttrId, oldAttrNm, oldAttrTp, attrDefine.TmpId,attrDefine.AttrId,attrDefine.AttrNm,attrDefine.AttrTp,attrDefine.LstUpdter);
         }
 
         [HttpDelete]
         [Route("Delete")]
-        public void Delete(string tmpId, string attrId, string attrNm, string attrTp)
+        public void Delete(long tmpId, string attrId, string attrNm, string attrTp)
         {
             operation.Delete(tmpId, attrId, attrNm, attrTp);
         }

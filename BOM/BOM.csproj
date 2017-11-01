@@ -89,12 +89,14 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="App_Start\WebApiConfig.cs" />
+    <Compile Include="Controllers\RelationController - Copy.cs" />
     <Compile Include="Controllers\AttrDefineOperationController.cs" />
     <Compile Include="Controllers\TempletController.cs" />
     <Compile Include="Controllers\SeqNoController.cs" />
     <Compile Include="Global.asax.cs">
       <DependentUpon>Global.asax</DependentUpon>
     </Compile>
+    <Compile Include="Models\RelationMaintainList.cs" />
     <Compile Include="Models\Templet.cs" />
     <Compile Include="Models\AttrDefineList.cs" />
     <Compile Include="Models\SeqNo.cs" />

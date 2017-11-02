@@ -82,20 +82,20 @@ namespace BOM.Models
             DBConnection.CloseConnection(sqlConnection);
         }
     }
-}
 
-public class NodeInfo
-{
-    public int NodeLevel { get; set; }
-    public long TmpId { get; set; }
-    public string TmpNm { get; set; }
-    public List<TempletAttribute> Attributes { get; set; }
-}
+    public class NodeInfo
+    {
+        public int NodeLevel { get; set; }
+        public long TmpId { get; set; }
+        public string TmpNm { get; set; }
+        public List<TempletAttribute> Attributes { get; set; }
+    }
 
-public class TempletAttribute
-{
-    public string Id { get; set; }
-    public string Name { get; set; }
-    public string Type { get; set; }
-}
+    public class TempletAttribute
+    {
+        public string Id { get; set; }
+        public string Name { get; set; }
+        public string Type { get; set; }
+    }
+
 }

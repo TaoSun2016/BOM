@@ -42,9 +42,9 @@ namespace BOM.Models
                     LstUpdter = state.LstUpdter;
                     log.Info("begin");
                     //Insert into AttrPass
-                    if (state.InsertStatements != null)
+                    if (state.InsertDetails != null)
                     {
-                        foreach (var insertState in state.InsertStatements)
+                        foreach (var insertState in state.InsertDetails)
                         {
                             sql = $"INSERT INTO ATTRPASS (TmpId,CTmpId,CAttrId,CAttrValue,ValueTp,PAttrId,Eq,Excld, Gt,Gteq,Lt,Lteq, rlSeqNo,CrtDate,Crter) values ({TmpId},{CTmpId},'{insertState.CAttrId}','{insertState.CAttrValue}','{insertState.ValueTp}','{insertState.PAttrId}','{insertState.Eq}','{insertState.Excld}','{insertState.Gt}','{insertState.Gteq}','{insertState.Lt}','{insertState.Lteq}',{rlSeqNo},'{DateTime.Now}','{Crter}')";
                             command.CommandText = sql;
@@ -386,7 +386,7 @@ namespace BOM.Models
             public int rlSeqNo { get; set; }
             public string Crter { get; set; }
             public string LstUpdter { get; set; }
-            public List<InsertStatement> InsertStatements { get; set; }
+            public List<InsertDetail> InsertDetails { get; set; }
             public List<UpdateDetail> UpdateDetails { get; set; }
             public List<DeleteDetail> DeleteDetails { get; set; }
             public List<UpdateSum> UpdateSums { get; set; }
@@ -395,7 +395,7 @@ namespace BOM.Models
 
         }
 
-        public class InsertStatement
+        public class InsertDetail
         {
             public string CAttrId { get; set; }
             public string CAttrValue { get; set; }

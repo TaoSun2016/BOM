@@ -89,7 +89,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="App_Start\WebApiConfig.cs" />
-    <Compile Include="Controllers\RelationController - Copy.cs" />
+    <Compile Include="Controllers\RelationController.cs" />
     <Compile Include="Controllers\AttrDefineOperationController.cs" />
     <Compile Include="Controllers\TempletController.cs" />
     <Compile Include="Controllers\SeqNoController.cs" />

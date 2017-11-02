@@ -40,315 +40,339 @@ namespace BOM.Models
                     rlSeqNo = (int)state.rlSeqNo;
                     Crter = state.Crter;
                     LstUpdter = state.LstUpdter;
-
+                    log.Info("begin");
                     //Insert into AttrPass
-                    foreach (var insertState in state.InsertStatements)
+                    if (state.InsertStatements != null)
                     {
-                        sql = $"INSERT INTO ATTRPASS (TmpId,CTmpId,CAttrId,CAttrValue,ValueTp,PAttrId,Eq,Excld, Gt,Gteq,Lt,Lteq, rlSeqNo,CrtDate,Crter) values ({TmpId},{CTmpId},'{insertState.CAttrId}','{insertState.CAttrValue}','{insertState.ValueTp}','{insertState.PAttrId}','{insertState.Eq}','{insertState.Excld}','{insertState.Gt}','{insertState.Gteq}','{insertState.Lt}','{insertState.Lteq}',{rlSeqNo}),'{DateTime.Now}','{Crter}'";
-                        command.CommandText = sql;
-                        try
+                        foreach (var insertState in state.InsertStatements)
                         {
-                            result = command.ExecuteNonQuery();
-                        }
-                        catch (Exception e)
-                        {
-                            log.Error(string.Format($"Insert into attrpass error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                            sqlTransaction.Rollback();
-                            DBConnection.CloseConnection(sqlConnection);
-                            throw;
-                        }
-                        if (result == 0)
-                        {
-                            log.Error(string.Format($"No data is inserted into attrpass!\nsql[{sql}]\n"));
-                            sqlTransaction.Rollback();
-                            DBConnection.CloseConnection(sqlConnection);
-                            throw new Exception("No data is inserted into attrpass!");
+                            sql = $"INSERT INTO ATTRPASS (TmpId,CTmpId,CAttrId,CAttrValue,ValueTp,PAttrId,Eq,Excld, Gt,Gteq,Lt,Lteq, rlSeqNo,CrtDate,Crter) values ({TmpId},{CTmpId},'{insertState.CAttrId}','{insertState.CAttrValue}','{insertState.ValueTp}','{insertState.PAttrId}','{insertState.Eq}','{insertState.Excld}','{insertState.Gt}','{insertState.Gteq}','{insertState.Lt}','{insertState.Lteq}',{rlSeqNo},'{DateTime.Now}','{Crter}')";
+                            command.CommandText = sql;
+                            log.Info(sql);
+                            try
+                            {
+                                result = command.ExecuteNonQuery();
+                            }
+                            catch (Exception e)
+                            {
+                                log.Error(string.Format($"Insert into attrpass error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                                sqlTransaction.Rollback();
+                                DBConnection.CloseConnection(sqlConnection);
+                                throw;
+                            }
+                            if (result == 0)
+                            {
+                                log.Error(string.Format($"No data is inserted into attrpass!\nsql[{sql}]\n"));
+                                sqlTransaction.Rollback();
+                                DBConnection.CloseConnection(sqlConnection);
+                                throw new Exception("No data is inserted into attrpass!");
+                            }
                         }
                     }
+                    
 
                     //Update AttrPass details
-                    foreach (var updateDetail in state.UpdateDetails)
+                    if (state.UpdateDetails != null)
                     {
-                        condition.Remove(0, condition.Length);
+                        foreach (var updateDetail in state.UpdateDetails)
+                        {
+                            condition.Remove(0, condition.Length);
 
-                        //OrigGteq
-                        if (updateDetail.OrigGteq != "1")
-                        {
-                            condition.Append(" Gteq != '1' ");
-                        }
-                        else
-                        {
-                            condition.Append(" Gteq = '1' ");
-                        }
+                            //OrigGteq
+                            if (updateDetail.OrigGteq != "1")
+                            {
+                                condition.Append(" Gteq != '1' ");
+                            }
+                            else
+                            {
+                                condition.Append(" Gteq = '1' ");
+                            }
 
-                        //OrigLteq
-                        if (updateDetail.OrigLteq != "1")
-                        {
-                            condition.Append("AND Lteq != '1' ");
-                        }
-                        else
-                        {
-                            condition.Append("AND Lteq = '1' ");
-                        }
+                            //OrigLteq
+                            if (updateDetail.OrigLteq != "1")
+                            {
+                                condition.Append("AND Lteq != '1' ");
+                            }
+                            else
+                            {
+                                condition.Append("AND Lteq = '1' ");
+                            }
 
-                        //OrigEq
-                        if (updateDetail.OrigEq.Length == 0)
-                        {
-                            condition.Append("AND (Eq = '' or Eq is null) ");
-                        }
-                        else
-                        {
-                            condition.Append($"AND Eq = '{updateDetail.OrigEq}' ");
-                        }
+                            //OrigEq
+                            if (updateDetail.OrigEq.Length == 0)
+                            {
+                                condition.Append("AND (Eq = '' or Eq is null) ");
+                            }
+                            else
+                            {
+                                condition.Append($"AND Eq = '{updateDetail.OrigEq}' ");
+                            }
 
-                        //OrigGt
-                        if (updateDetail.OrigGt.Length == 0)
-                        {
-                            condition.Append("AND (Gt = '' or Gt is null) ");
-                        }
-                        else
-                        {
-                            condition.Append($"AND Gt = '{updateDetail.OrigGt}' ");
-                        }
+                            //OrigGt
+                            if (updateDetail.OrigGt.Length == 0)
+                            {
+                                condition.Append("AND (Gt = '' or Gt is null) ");
+                            }
+                            else
+                            {
+                                condition.Append($"AND Gt = '{updateDetail.OrigGt}' ");
+                            }
 
-                        //OrigLt
-                        if (updateDetail.OrigLt.Length == 0)
-                        {
-                            condition.Append("AND (Lt = '' or Lt is null) ");
-                        }
-                        else
-                        {
-                            condition.Append($"AND Lt = '{updateDetail.OrigLt}' ");
-                        }
+                            //OrigLt
+                            if (updateDetail.OrigLt.Length == 0)
+                            {
+                                condition.Append("AND (Lt = '' or Lt is null) ");
+                            }
+                            else
+                            {
+                                condition.Append($"AND Lt = '{updateDetail.OrigLt}' ");
+                            }
 
-                        //OrigExcld
-                        if (updateDetail.OrigExcld.Length == 0)
-                        {
-                            condition.Append("AND (Excld = '' or Excld is null) ");
-                        }
-                        else
-                        {
-                            condition.Append($"AND Excld = '{updateDetail.OrigExcld}' ");
-                        }
+                            //OrigExcld
+                            if (updateDetail.OrigExcld.Length == 0)
+                            {
+                                condition.Append("AND (Excld = '' or Excld is null) ");
+                            }
+                            else
+                            {
+                                condition.Append($"AND Excld = '{updateDetail.OrigExcld}' ");
+                            }
 
-                        //OrigPAttrId
-                        if (updateDetail.OrigPAttrId.Length == 0)
-                        {
-                            condition.Append("AND (PAttrId = '' or PAttrId is null) ");
-                        }
-                        else
-                        {
-                            condition.Append($"AND PAttrId = '{updateDetail.OrigPAttrId}'");
-                        }
-                        sql = $"UPDATE ATTRPASS SET Eq = '{updateDetail.Eq}', Excld = '{updateDetail.Excld}', Gt = '{updateDetail.Gt}', Gteq = '{updateDetail.Gteq}', Lt = '{updateDetail.Lt}', Lteq = '{updateDetail.Lteq}' WHERE TmpId = {TmpId} and CTmpId = {CTmpId} and rlSeqNo = {rlSeqNo} and CAttrId = '{updateDetail.OrigCAttrId}' and CAttrValue = '{updateDetail.OrigCAttrValue}' and ValueTp = '{updateDetail.OrigValueTp}' and " + condition.ToString();
-
-                        command.CommandText = sql;
-                        try
-                        {
-                            result = command.ExecuteNonQuery();
-                        }
-                        catch (Exception e)
-                        {
-                            log.Error(string.Format($"Update attrpass error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                            sqlTransaction.Rollback();
-                            DBConnection.CloseConnection(sqlConnection);
-                            throw;
-                        }
-                        if (result == 0)
-                        {
-                            log.Error(string.Format($"No data is updated in attrpass!\nsql[{sql}]\n"));
-                            sqlTransaction.Rollback();
-                            DBConnection.CloseConnection(sqlConnection);
-                            throw new Exception("No data is updated in attrpass!");
+                            //OrigPAttrId
+                            if (updateDetail.OrigPAttrId.Length == 0)
+                            {
+                                condition.Append("AND (PAttrId = '' or PAttrId is null) ");
+                            }
+                            else
+                            {
+                                condition.Append($"AND PAttrId = '{updateDetail.OrigPAttrId}'");
+                            }
+                            sql = $"UPDATE ATTRPASS SET Eq = '{updateDetail.Eq}', Excld = '{updateDetail.Excld}', Gt = '{updateDetail.Gt}', Gteq = '{updateDetail.Gteq}', Lt = '{updateDetail.Lt}', Lteq = '{updateDetail.Lteq}', LstUpdtDate = '{DateTime.Now}', LstUpdter = '{LstUpdter}' WHERE TmpId = {TmpId} and CTmpId = {CTmpId} and rlSeqNo = {rlSeqNo} and CAttrId = '{updateDetail.OrigCAttrId}' and CAttrValue = '{updateDetail.OrigCAttrValue}' and ValueTp = '{updateDetail.OrigValueTp}' and " + condition.ToString();
+                            log.Info(sql);
+                            command.CommandText = sql;
+                            try
+                            {
+                                result = command.ExecuteNonQuery();
+                            }
+                            catch (Exception e)
+                            {
+                                log.Error(string.Format($"Update attrpass error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                                sqlTransaction.Rollback();
+                                DBConnection.CloseConnection(sqlConnection);
+                                throw;
+                            }
+                            if (result == 0)
+                            {
+                                log.Error(string.Format($"No data is updated in attrpass!\nsql[{sql}]\n"));
+                                sqlTransaction.Rollback();
+                                DBConnection.CloseConnection(sqlConnection);
+                                throw new Exception("No data is updated in attrpass!");
+                            }
                         }
                     }
+
 
                     //Delete AttrPass details
-                    foreach (var deleteDetail in state.DeleteDetails)
+                    if (state.DeleteDetails != null)
                     {
-                        condition.Remove(0, condition.Length);
+                        foreach (var deleteDetail in state.DeleteDetails)
+                        {
+                            condition.Remove(0, condition.Length);
 
-                        //OrigGteq
-                        if (deleteDetail.OrigGteq != "1")
-                        {
-                            condition.Append(" Gteq != '1' ");
-                        }
-                        else
-                        {
-                            condition.Append(" Gteq = '1' ");
-                        }
+                            //OrigGteq
+                            if (deleteDetail.OrigGteq != "1")
+                            {
+                                condition.Append(" Gteq != '1' ");
+                            }
+                            else
+                            {
+                                condition.Append(" Gteq = '1' ");
+                            }
 
-                        //OrigLteq
-                        if (deleteDetail.OrigLteq != "1")
-                        {
-                            condition.Append("AND Lteq != '1' ");
-                        }
-                        else
-                        {
-                            condition.Append("AND Lteq = '1' ");
-                        }
+                            //OrigLteq
+                            if (deleteDetail.OrigLteq != "1")
+                            {
+                                condition.Append("AND Lteq != '1' ");
+                            }
+                            else
+                            {
+                                condition.Append("AND Lteq = '1' ");
+                            }
 
-                        //OrigEq
-                        if (deleteDetail.OrigEq.Length == 0)
-                        {
-                            condition.Append("AND (Eq = '' or Eq is null) ");
-                        }
-                        else
-                        {
-                            condition.Append($"AND Eq = '{deleteDetail.OrigEq}' ");
-                        }
+                            //OrigEq
+                            if (deleteDetail.OrigEq.Length == 0)
+                            {
+                                condition.Append("AND (Eq = '' or Eq is null) ");
+                            }
+                            else
+                            {
+                                condition.Append($"AND Eq = '{deleteDetail.OrigEq}' ");
+                            }
 
-                        //OrigGt
-                        if (deleteDetail.OrigGt.Length == 0)
-                        {
-                            condition.Append("AND (Gt = '' or Gt is null) ");
-                        }
-                        else
-                        {
-                            condition.Append($"AND Gt = '{deleteDetail.OrigGt}' ");
-                        }
+                            //OrigGt
+                            if (deleteDetail.OrigGt.Length == 0)
+                            {
+                                condition.Append("AND (Gt = '' or Gt is null) ");
+                            }
+                            else
+                            {
+                                condition.Append($"AND Gt = '{deleteDetail.OrigGt}' ");
+                            }
 
-                        //OrigLt
-                        if (deleteDetail.OrigLt.Length == 0)
-                        {
-                            condition.Append("AND (Lt = '' or Lt is null) ");
-                        }
-                        else
-                        {
-                            condition.Append($"AND Lt = '{deleteDetail.OrigLt}' ");
-                        }
+                            //OrigLt
+                            if (deleteDetail.OrigLt.Length == 0)
+                            {
+                                condition.Append("AND (Lt = '' or Lt is null) ");
+                            }
+                            else
+                            {
+                                condition.Append($"AND Lt = '{deleteDetail.OrigLt}' ");
+                            }
 
-                        //OrigExcld
-                        if (deleteDetail.OrigExcld.Length == 0)
-                        {
-                            condition.Append("AND (Excld = '' or Excld is null) ");
-                        }
-                        else
-                        {
-                            condition.Append($"AND Excld = '{deleteDetail.OrigExcld}' ");
-                        }
+                            //OrigExcld
+                            if (deleteDetail.OrigExcld.Length == 0)
+                            {
+                                condition.Append("AND (Excld = '' or Excld is null) ");
+                            }
+                            else
+                            {
+                                condition.Append($"AND Excld = '{deleteDetail.OrigExcld}' ");
+                            }
 
-                        //OrigPAttrId
-                        if (deleteDetail.OrigPAttrId.Length == 0)
-                        {
-                            condition.Append("AND (PAttrId = '' or PAttrId is null) ");
-                        }
-                        else
-                        {
-                            condition.Append($"AND PAttrId = '{deleteDetail.OrigPAttrId}'");
-                        }
+                            //OrigPAttrId
+                            if (deleteDetail.OrigPAttrId.Length == 0)
+                            {
+                                condition.Append("AND (PAttrId = '' or PAttrId is null) ");
+                            }
+                            else
+                            {
+                                condition.Append($"AND PAttrId = '{deleteDetail.OrigPAttrId}'");
+                            }
 
-                        sql = $"DELETE FROM ATTRPASS WHERE TmpId = {TmpId} and CTmpId = {CTmpId} and rlSeqNo = {rlSeqNo} and CAttrId = '{deleteDetail.OrigCAttrId}' and CAttrValue = '{deleteDetail.OrigCAttrValue}' and ValueTp = '{deleteDetail.OrigValueTp}' and " + condition.ToString();
-
-                        command.CommandText = sql;
-                        try
-                        {
-                            result = command.ExecuteNonQuery();
-                        }
-                        catch (Exception e)
-                        {
-                            log.Error(string.Format($"Delete from attrpass error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                            sqlTransaction.Rollback();
-                            DBConnection.CloseConnection(sqlConnection);
-                            throw;
-                        }
-                        if (result == 0)
-                        {
-                            log.Error(string.Format($"No data is deleted in attrpass!\nsql[{sql}]\n"));
-                            sqlTransaction.Rollback();
-                            DBConnection.CloseConnection(sqlConnection);
-                            throw new Exception("No data is deleted in attrpass!");
+                            sql = $"DELETE FROM ATTRPASS WHERE TmpId = {TmpId} and CTmpId = {CTmpId} and rlSeqNo = {rlSeqNo} and CAttrId = '{deleteDetail.OrigCAttrId}' and CAttrValue = '{deleteDetail.OrigCAttrValue}' and ValueTp = '{deleteDetail.OrigValueTp}' and " + condition.ToString();
+                            log.Info(sql);
+                            command.CommandText = sql;
+                            try
+                            {
+                                result = command.ExecuteNonQuery();
+                            }
+                            catch (Exception e)
+                            {
+                                log.Error(string.Format($"Delete from attrpass error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                                sqlTransaction.Rollback();
+                                DBConnection.CloseConnection(sqlConnection);
+                                throw;
+                            }
+                            if (result == 0)
+                            {
+                                log.Error(string.Format($"No data is deleted in attrpass!\nsql[{sql}]\n"));
+                                sqlTransaction.Rollback();
+                                DBConnection.CloseConnection(sqlConnection);
+                                throw new Exception("No data is deleted in attrpass!");
+                            }
                         }
                     }
+
 
                     //Update sum
-                    foreach (var updateSum in state.UpdateSums)
+                    if (state.UpdateSums != null)
                     {
+                        foreach (var updateSum in state.UpdateSums)
+                        {
+                            sql = $"UPDATE ATTRPASS SET CAttrValue = '{updateSum.CAttrValue}', ValueTp = '{updateSum.ValueTp}', LstUpdtDate = '{DateTime.Now}', LstUpdter = '{LstUpdter}' WHERE TmpId = {TmpId} and CTmpId = {CTmpId} and rlSeqNo = {rlSeqNo} and CAttrId = '{updateSum.OrigCAttrId}' and CAttrValue = '{updateSum.OrigCAttrValue}' and ValueTp = '{updateSum.OrigValueTp}'";
 
-
-                        sql = $"UPDATE ATTRPASS SET CAttrValue = '{updateSum.CAttrValue}', ValueTp = '{updateSum.ValueTp}' WHERE TmpId = {TmpId} and CTmpId = {CTmpId} and rlSeqNo = {rlSeqNo} and CAttrId = '{updateSum.OrigCAttrId}' and CAttrValue = '{updateSum.OrigCAttrValue}' and ValueTp = '{updateSum.OrigValueTp}'";
-                        command.CommandText = sql;
-                        try
-                        {
-                            result = command.ExecuteNonQuery();
-                        }
-                        catch (Exception e)
-                        {
-                            log.Error(string.Format($"Update attrpass sum error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                            sqlTransaction.Rollback();
-                            DBConnection.CloseConnection(sqlConnection);
-                            throw;
-                        }
-                        if (result == 0)
-                        {
-                            log.Error(string.Format($"No data is updated in attrpass!\nsql[{sql}]\n"));
-                            sqlTransaction.Rollback();
-                            DBConnection.CloseConnection(sqlConnection);
-                            throw new Exception("No data is updated in attrpass!");
+                            log.Info(sql);
+                            command.CommandText = sql;
+                            try
+                            {
+                                result = command.ExecuteNonQuery();
+                            }
+                            catch (Exception e)
+                            {
+                                log.Error(string.Format($"Update attrpass sum error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                                sqlTransaction.Rollback();
+                                DBConnection.CloseConnection(sqlConnection);
+                                throw;
+                            }
+                            if (result == 0)
+                            {
+                                log.Error(string.Format($"No data is updated in attrpass!\nsql[{sql}]\n"));
+                                sqlTransaction.Rollback();
+                                DBConnection.CloseConnection(sqlConnection);
+                                throw new Exception("No data is updated in attrpass!");
+                            }
                         }
                     }
+
 
                     //Delete sum
-                    foreach (var deleteSum in state.DeleteSums)
+                    if (state.DeleteSums != null)
                     {
-                        sql = $"DELETE FROM ATTRPASS WHERE TmpId = {TmpId} and CTmpId = {CTmpId} and rlSeqNo = {rlSeqNo} and CAttrId = '{deleteSum.OrigCAttrId}' and CAttrValue = '{deleteSum.OrigCAttrValue}' and ValueTp = '{deleteSum.OrigValueTp}'";
-
-                        command.CommandText = sql;
-                        try
+                        foreach (var deleteSum in state.DeleteSums)
                         {
-                            result = command.ExecuteNonQuery();
-                        }
-                        catch (Exception e)
-                        {
-                            log.Error(string.Format($"Delete attrpass sum error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                            sqlTransaction.Rollback();
-                            DBConnection.CloseConnection(sqlConnection);
-                            throw;
-                        }
-                        if (result == 0)
-                        {
-                            log.Error(string.Format($"No data is deleted in attrpass!\nsql[{sql}]\n"));
-                            sqlTransaction.Rollback();
-                            DBConnection.CloseConnection(sqlConnection);
-                            throw new Exception("No data is deleted in attrpass!");
+                            sql = $"DELETE FROM ATTRPASS WHERE TmpId = {TmpId} and CTmpId = {CTmpId} and rlSeqNo = {rlSeqNo} and CAttrId = '{deleteSum.OrigCAttrId}' and CAttrValue = '{deleteSum.OrigCAttrValue}' and ValueTp = '{deleteSum.OrigValueTp}'";
+                            log.Info(sql);
+                            command.CommandText = sql;
+                            try
+                            {
+                                result = command.ExecuteNonQuery();
+                            }
+                            catch (Exception e)
+                            {
+                                log.Error(string.Format($"Delete attrpass sum error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                                sqlTransaction.Rollback();
+                                DBConnection.CloseConnection(sqlConnection);
+                                throw;
+                            }
+                            if (result == 0)
+                            {
+                                log.Error(string.Format($"No data is deleted in attrpass!\nsql[{sql}]\n"));
+                                sqlTransaction.Rollback();
+                                DBConnection.CloseConnection(sqlConnection);
+                                throw new Exception("No data is deleted in attrpass!");
+                            }
                         }
                     }
+
 
                     //Update Default
-
-                    foreach (var updateDefault in state.UpdateDefaults)
+                    if (state.UpdateDefaults != null)
                     {
-                        bool newFlag = (updateDefault.NewFlag == "1");
-                        if (newFlag)
+                        foreach (var updateDefault in state.UpdateDefaults)
                         {
-                            sql = $"INSERT INTO ATTRPASS (Ctmpid,rlseqno,tmpid,cattrid,cattrvalue,valuetp,pattrid) values ({CTmpId},{rlSeqNo},{TmpId},'{updateDefault.CAttrId}','{updateDefault.CAttrValue}',0,0)";
-                        }
-                        else
-                        {
-                            sql = $"UPDATE ATTRPASS SET CAttrValue = '{updateDefault.CAttrValue}' WHERE CTmpId = {CTmpId} AND rlSeqNo='{rlSeqNo}' AND TmpId = {TmpId} AND CAttrId = '{updateDefault.CAttrId}' AND ValueTp = '0'";
-                        }
+                            bool newFlag = (updateDefault.NewFlag == "1");
+                            if (newFlag)
+                            {
+                                sql = $"INSERT INTO ATTRPASS (Ctmpid,rlseqno,tmpid,cattrid,cattrvalue,valuetp,pattrid) values ({CTmpId},{rlSeqNo},{TmpId},'{updateDefault.CAttrId}','{updateDefault.CAttrValue}',0,0)";
+                            }
+                            else
+                            {
+                                sql = $"UPDATE ATTRPASS SET CAttrValue = '{updateDefault.CAttrValue}',LstUpdtDate = '{DateTime.Now}', LstUpdter = '{LstUpdter}' WHERE CTmpId = {CTmpId} AND rlSeqNo='{rlSeqNo}' AND TmpId = {TmpId} AND CAttrId = '{updateDefault.CAttrId}' AND ValueTp = '0'";
+                            }
 
-                        command.CommandText = sql;
-
-                        try
-                        {
-                            result = command.ExecuteNonQuery();
-                        }
-                        catch (Exception e)
-                        {
-                            log.Error(string.Format(newFlag ? "Insert" : "Update" + $" attrpass default error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                            sqlTransaction.Rollback();
-                            DBConnection.CloseConnection(sqlConnection);
-                            throw;
-                        }
-                        if (result == 0)
-                        {
-                            log.Error(string.Format("No data is " + (newFlag ? "Inserted" : "Updated")+ $" in attrpass!\nsql[{sql}]\n"));
-                            sqlTransaction.Rollback();
-                            DBConnection.CloseConnection(sqlConnection);
-                            throw new Exception("No data is " + (newFlag ? "Inserted" : "Updated") + $" in attrpass!");
+                            command.CommandText = sql;
+                            log.Info(sql);
+                            try
+                            {
+                                result = command.ExecuteNonQuery();
+                            }
+                            catch (Exception e)
+                            {
+                                log.Error(string.Format(newFlag ? "Insert" : "Update" + $" attrpass default error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                                sqlTransaction.Rollback();
+                                DBConnection.CloseConnection(sqlConnection);
+                                throw;
+                            }
+                            if (result == 0)
+                            {
+                                log.Error(string.Format("No data is " + (newFlag ? "Inserted" : "Updated") + $" in attrpass!\nsql[{sql}]\n"));
+                                sqlTransaction.Rollback();
+                                DBConnection.CloseConnection(sqlConnection);
+                                throw new Exception("No data is " + (newFlag ? "Inserted" : "Updated") + $" in attrpass!");
+                            }
                         }
                     }
+                    
                 }
             }
             sqlTransaction.Commit();

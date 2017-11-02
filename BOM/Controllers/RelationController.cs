@@ -15,13 +15,11 @@ namespace BOM.Controllers
     {
         log4net.ILog log = log4net.LogManager.GetLogger("Relation");
 
-
-
-        
         [HttpPost]
         [Route("Batch")]
         public void Batch(List<RelationMaintain> list)
         {
+            log.Info("init");
             RelationMaintainList relations = new RelationMaintainList(list);
             try
             {

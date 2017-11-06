@@ -11,22 +11,18 @@ namespace BOM.Models
     {
         log4net.ILog log = log4net.LogManager.GetLogger("BOMTree");
 
-        public void FindChildrenTree(ref List<NodeInfo> list, long tmpId, int level)
+        //Open BOM Tree
+        public void FindChildrenTree(SqlConnection connection, ref List<NodeInfo> list, long tmpId, int rlSeqNo, int level)
         {
-            int result = 0;
             string sql = null;
             NodeInfo nodeInfo = new NodeInfo();
 
 
 
-            SqlConnection sqlConnection = DBConnection.OpenConnection();
             SqlDataReader dataReader = null;
-            SqlTransaction sqlTransaction = sqlConnection.BeginTransaction();
             using (SqlCommand command = new SqlCommand())
             {
-                command.Connection = sqlConnection;
-                command.Transaction = sqlTransaction;
-
+                command.Connection = connection;
                 sql = $"SELECT TmpNm FROM TmpInfo WHERE TmpId = {tmpId}";
                 command.CommandText = sql;
 
@@ -38,12 +34,12 @@ namespace BOM.Models
                         nodeInfo.NodeLevel = level;
                         nodeInfo.TmpId = tmpId;
                         nodeInfo.TmpNm = dataReader[0].ToString();
+                        nodeInfo.rlSeqNo = rlSeqNo;
                     }
                     else
                     {
                         log.Error(string.Format($"Select TmpInfo error!\nsql[{sql}]\nError"));
                         dataReader.Close();
-                        DBConnection.CloseConnection(sqlConnection);
                         throw new Exception("No data found!");
                     }
                 }
@@ -51,11 +47,10 @@ namespace BOM.Models
                 {
                     log.Error(string.Format($"Select TmpInfo error!\nsql[{sql}]\nError[{e.StackTrace}]"));
                     dataReader.Close();
-                    DBConnection.CloseConnection(sqlConnection);
                     throw;
                 }
 
-                sql = $"SELECT AttrId, AttrNm, AttrTp FROM AttrDefine WHERE TmpId = {tmpId} or TmpId = 0";
+                sql = $"SELECT CASE TmpId WHEN 0 THEN 0 ELSE 1 END AS Flag, AttrId, AttrNm, AttrTp FROM AttrDefine WHERE TmpId = {tmpId} or TmpId = 0";
                 command.CommandText = sql;
 
                 try
@@ -63,39 +58,202 @@ namespace BOM.Models
                     dataReader = command.ExecuteReader();
                     while (dataReader.Read())
                     {
-                        nodeInfo.Attributes.Add(new TempletAttribute { Id=dataReader["AttrId"].ToString(),Name= dataReader["AttrNm"].ToString(), Type = dataReader["AttrTp"].ToString() });
+                        nodeInfo.Attributes.Add(new TempletAttribute { Flag = (int)dataReader["Flag"], Id = dataReader["AttrId"].ToString(), Name = dataReader["AttrNm"].ToString(), Type = dataReader["AttrTp"].ToString() });
                     }
                 }
                 catch (Exception e)
                 {
                     log.Error(string.Format($"Select AttrDefine error!\nsql[{sql}]\nError[{e.StackTrace}]"));
                     dataReader.Close();
-                    DBConnection.CloseConnection(sqlConnection);
                     throw;
                 }
                 dataReader.Close();
                 list.Add(nodeInfo);
 
+                sql = $"SELECT CTmpId, rlSeqNo FROM Relation WHERE TmpId = {tmpId} ORDER BY CTmpId, rlSeqNo";
+                command.CommandText = sql;
 
+                try
+                {
+                    dataReader = command.ExecuteReader();
+                    if (!dataReader.HasRows)
+                    {
+                        return;
+                    }
+                    else
+                    {
+                        while (dataReader.Read())
+                        {
+                            FindChildrenTree(connection, ref list, (long)dataReader["CTmpId"], (int)dataReader["rlSeqNo"], level + 1);
+                        }
+                    }
+
+                }
+                catch (Exception e)
+                {
+                    log.Error(string.Format($"Select AttrDefine error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                    dataReader.Close();
+                    throw;
+                }
             }
 
-            DBConnection.CloseConnection(sqlConnection);
         }
-    }
 
-    public class NodeInfo
-    {
-        public int NodeLevel { get; set; }
-        public long TmpId { get; set; }
-        public string TmpNm { get; set; }
-        public List<TempletAttribute> Attributes { get; set; }
-    }
+        public void ApplyCode(NodeInfo nodeInfo)
+        {
+            int result = -1;
+            bool hasPrivateAttribute = false;
+            string sql = null;
+            string insertState = null;
+            StringBuilder insertBuilder = new StringBuilder($"INSERT INTO {nodeInfo.TmpId} (");
+            StringBuilder insertValues = new StringBuilder($" ) VALUES (");
+            SqlConnection sqlConnection = DBConnection.OpenConnection();
+            SqlTransaction sqlTransaction = sqlConnection.BeginTransaction();
+            using (SqlCommand command = new SqlCommand())
+            {
+                command.Connection = sqlConnection;
+                command.Transaction = sqlTransaction;
 
-    public class TempletAttribute
-    {
-        public string Id { get; set; }
-        public string Name { get; set; }
-        public string Type { get; set; }
-    }
+                //If nodeInfo has private attribute
+                var privateAttributes = nodeInfo.Attributes.Where(m => m.Flag == 1);
+                hasPrivateAttribute = (privateAttributes.Count() > 0);
+                if (hasPrivateAttribute)
+                {
+                    //Check if the private attribute table exists
+                    sql = $"SELECT COUNT(*) FROM SYSOBJECTS WHERE NAME = '{nodeInfo.TmpId}' ";
+                    command.CommandText = sql;
+                    try
+                    {
+                        result = (int)command.ExecuteScalar();
+                    }
+                    catch (Exception e)
+                    {
+                        log.Error(string.Format($"Look for talbe {nodeInfo.TmpId} Error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                        DBConnection.CloseConnection(sqlConnection);
+                        throw;
+                    }
+                    if (result == 0)
+                    {
+                        log.Error(string.Format($"Table {nodeInfo.TmpId} doesn't exsit!\nsql[{sql}]\n"));
+                        DBConnection.CloseConnection(sqlConnection);
+                        throw new Exception($"Table {nodeInfo.TmpId} doesn't exsit!!");
+                    }
 
-}
+                    //Check duplicated records
+                    StringBuilder builder = new StringBuilder($"SELECT COUNT(*) FROM '{nodeInfo.TmpId}' WHERE");
+
+                    int counter = 0;
+                    foreach (var attrbute in privateAttributes)
+                    {
+                        counter++;
+                        builder.Append($" {attrbute.Id} = {attrbute.Value}");
+                        insertBuilder.Append($" {attrbute.Id},");
+                        insertValues.Append($" '{attrbute.Value}',");
+                        if (counter != privateAttributes.Count())
+                        {
+                            builder.Append($" AND");
+                        }
+                    }
+                    sql = builder.ToString();
+                    
+                    command.CommandText = sql;
+                    try
+                    {
+                        result = (int)command.ExecuteScalar();
+                    }
+                    catch (Exception e)
+                    {
+                        log.Error(string.Format($"Select private attribute Error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                        DBConnection.CloseConnection(sqlConnection);
+                        throw;
+                    }
+                    if (result > 0)
+                    {
+                        log.Error(string.Format($"The private attrbutes have already exsited!\nsql[{sql}]\n"));
+                        DBConnection.CloseConnection(sqlConnection);
+                        throw new Exception("The private attrbutes have already exsited!!");
+                    }
+                }
+
+                //Get Materiel Identification
+                string materielIdentification = null;
+                sql = $"SELECT * FROM SEQ_NO WHERE Ind_Key = '{nodeInfo.TmpId}'";
+
+                try
+                {
+                    SqlDataReader dataReader = command.ExecuteReader();
+
+                    if (dataReader.HasRows)
+                    {
+                        dataReader.Read();
+
+
+                        long nextNo = (long)dataReader["NEXT_NO"];
+
+                        dataReader.Close();
+
+                        materielIdentification = $"{nodeInfo.TmpId}" + Convert.ToString(nextNo, 8);
+                        nextNo += 1;
+                        sql = $"UPDATE SEQ_NO SET NEXT_NO = {nextNo} WHERE IND_KEY = '{nodeInfo.TmpId}'";
+                    }
+                    else
+                    {
+                        log.Error(string.Format($"Can't find record in table SEQ_NO.[{sql}]"));
+                        dataReader.Close();
+                        DBConnection.CloseConnection(sqlConnection);
+                        throw new Exception(string.Format($"Can't find record in table SEQ_NO.[{sql}]"));
+                    }
+
+                    command.CommandText = sql;
+                    result = command.ExecuteNonQuery();
+                    if (result == 0)
+                    {
+                        log.Error($"No record is updated,TmpID=[{nodeInfo.TmpId}]");
+                        DBConnection.CloseConnection(sqlConnection);
+                        throw new Exception($"No record is updated,TmpID=[{nodeInfo.TmpId}]");
+                    }
+                }
+                catch
+                {
+                    log.Error($"Get MaterielIdentification Error,TmpID=[{nodeInfo.TmpId}]sql=[{sql}]");
+                    sqlTransaction.Rollback();
+                    DBConnection.CloseConnection(sqlConnection);
+                    throw;
+                }
+
+
+                //Register private attribute values
+                if (hasPrivateAttribute)
+                {
+                    insertState = insertBuilder.ToString() + $" materielIdentification)" + insertValues.ToString()+$" {materielIdentification}";
+                }
+
+                //Register default attribute values
+
+
+
+
+
+            }
+        }
+
+        public class NodeInfo
+        {
+            public int NodeLevel { get; set; }
+            public long TmpId { get; set; }
+            public string TmpNm { get; set; }
+            public int rlSeqNo { get; set; }
+            public List<TempletAttribute> Attributes { get; set; }
+        }
+
+        public class TempletAttribute
+        {
+            //0:缺省属性 1:私有属性
+            public int Flag { get; set; }
+            public string Id { get; set; }
+            public string Name { get; set; }
+            public string Type { get; set; }
+            public string Value { get; set; }
+        }
+
+    }

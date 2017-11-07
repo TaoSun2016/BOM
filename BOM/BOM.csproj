@@ -91,6 +91,7 @@
     <Compile Include="App_Start\WebApiConfig.cs" />
     <Compile Include="Controllers\RelationController.cs" />
     <Compile Include="Controllers\AttrDefineOperationController.cs" />
+    <Compile Include="Controllers\BOMController.cs" />
     <Compile Include="Controllers\TempletController.cs" />
     <Compile Include="Controllers\SeqNoController.cs" />
     <Compile Include="Global.asax.cs">

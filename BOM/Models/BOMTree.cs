@@ -284,6 +284,40 @@ namespace BOM.Models
             }
             DBConnection.CloseConnection(sqlConnection);
         }
+
+        public void DeleteNode(long pMaterielId, long materielId, int rlSeqNo)
+        {
+            int result = -1;
+            string sql = null;
+
+            SqlConnection sqlConnection = DBConnection.OpenConnection();
+
+            using (SqlCommand command = new SqlCommand())
+            {
+                command.Connection = sqlConnection;
+                sql = $"DELETE FROM BOM WHERE materielIdentification = {pMaterielId} AND CmId = {materielId} and rlSeqNo = {rlSeqNo}";
+                command.CommandText = sql;
+                try
+                {
+                    result = command.ExecuteNonQuery();
+                }
+                catch (Exception e)
+                {
+                    log.Error(string.Format($"Delete from BOM Error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                    DBConnection.CloseConnection(sqlConnection);
+                    throw;
+                }
+                if (result == 0)
+                {
+                    log.Error(string.Format($"No record is deleted!\nsql[{sql}]\n"));
+                    DBConnection.CloseConnection(sqlConnection);
+                    throw new Exception("No record is deleted!");
+                }
+            }
+            DBConnection.CloseConnection(sqlConnection);
+
+        }
+
     }
     public class NodeInfo
     {

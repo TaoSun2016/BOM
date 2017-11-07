@@ -103,8 +103,8 @@ namespace BOM.Models
         {
             int result = -1;
             bool hasPrivateAttribute = false;
+            string materielIdentification = null;
             string sql = null;
-            string insertState = null;
             StringBuilder insertBuilder = new StringBuilder($"INSERT INTO {nodeInfo.TmpId} (");
             StringBuilder insertValues = new StringBuilder($" ) VALUES (");
             SqlConnection sqlConnection = DBConnection.OpenConnection();
@@ -155,7 +155,7 @@ namespace BOM.Models
                         }
                     }
                     sql = builder.ToString();
-                    
+
                     command.CommandText = sql;
                     try
                     {
@@ -176,7 +176,7 @@ namespace BOM.Models
                 }
 
                 //Get Materiel Identification
-                string materielIdentification = null;
+
                 sql = $"SELECT * FROM SEQ_NO WHERE Ind_Key = '{nodeInfo.TmpId}'";
 
                 try
@@ -225,35 +225,84 @@ namespace BOM.Models
                 //Register private attribute values
                 if (hasPrivateAttribute)
                 {
-                    insertState = insertBuilder.ToString() + $" materielIdentification)" + insertValues.ToString()+$" {materielIdentification}";
+                    sql = insertBuilder.ToString() + $" materielIdentification)" + insertValues.ToString() + $" {materielIdentification}";
+
+                    command.CommandText = sql;
+                    try
+                    {
+                        result = command.ExecuteNonQuery();
+                    }
+                    catch (Exception e)
+                    {
+                        log.Error(string.Format($"Register private attribute Error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                        sqlTransaction.Rollback();
+                        DBConnection.CloseConnection(sqlConnection);
+                        throw;
+                    }
+                    if (result == 0)
+                    {
+                        log.Error(string.Format($"No private attrbutes is registered!\nsql[{sql}]\n"));
+                        sqlTransaction.Rollback();
+                        DBConnection.CloseConnection(sqlConnection);
+                        throw new Exception("No private attrbutes is registered!");
+                    }
                 }
 
                 //Register default attribute values
+                //前台必须给所有的缺省属性赋值,没有值赋缺省值
+                insertBuilder = new StringBuilder($"INSERT INTO DeafaultAttr (");
+                insertValues = new StringBuilder($" ) VALUES (");
+                var defaultAttributes = nodeInfo.Attributes.Where(m => m.Flag == 0);
+                foreach (var defaultAttrbute in defaultAttributes)
+                {
+                    insertBuilder.Append($" {defaultAttrbute.Id},");
+                    insertValues.Append($" '{defaultAttrbute.Value}',");
+                }
+                sql = insertBuilder.ToString() + $" materielIdentification)" + insertValues.ToString() + $" {materielIdentification}";
 
-
-
-
+                command.CommandText = sql;
+                try
+                {
+                    result = command.ExecuteNonQuery();
+                }
+                catch (Exception e)
+                {
+                    log.Error(string.Format($"Register default attribute Error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                    sqlTransaction.Rollback();
+                    DBConnection.CloseConnection(sqlConnection);
+                    throw;
+                }
+                if (result == 0)
+                {
+                    log.Error(string.Format($"No default attrbutes is registered!\nsql[{sql}]\n"));
+                    sqlTransaction.Rollback();
+                    DBConnection.CloseConnection(sqlConnection);
+                    throw new Exception("No default attrbutes is registered!");
+                }
+                sqlTransaction.Commit();
 
             }
+            DBConnection.CloseConnection(sqlConnection);
         }
-
-        public class NodeInfo
-        {
-            public int NodeLevel { get; set; }
-            public long TmpId { get; set; }
-            public string TmpNm { get; set; }
-            public int rlSeqNo { get; set; }
-            public List<TempletAttribute> Attributes { get; set; }
-        }
-
-        public class TempletAttribute
-        {
-            //0:缺省属性 1:私有属性
-            public int Flag { get; set; }
-            public string Id { get; set; }
-            public string Name { get; set; }
-            public string Type { get; set; }
-            public string Value { get; set; }
-        }
-
     }
+    public class NodeInfo
+    {
+        public int NodeLevel { get; set; }
+        public long TmpId { get; set; }
+        public string TmpNm { get; set; }
+        public int rlSeqNo { get; set; }
+        public List<TempletAttribute> Attributes { get; set; }
+    }
+
+    public class TempletAttribute
+    {
+        //0:缺省属性 1:私有属性
+        public int Flag { get; set; }
+        public string Id { get; set; }
+        public string Name { get; set; }
+        public string Type { get; set; }
+        public string Value { get; set; }
+    }
+
+
+}

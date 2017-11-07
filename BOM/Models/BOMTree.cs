@@ -316,6 +316,15 @@ namespace BOM.Models
             DBConnection.CloseConnection(sqlConnection);
 
         }
+        public List<NodeInfo> Expand(NodeInfo node)
+        {
+
+        }
+
+        public void Save(List<NodeInfo> nodes)
+        {
+
+        }
 
     }
     public class NodeInfo

@@ -1,6 +1,7 @@
 ﻿using BOM.Models;
 using System;
 using System.Collections.Generic;
+using System.Data.SqlClient;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -12,115 +13,79 @@ namespace BOM.Controllers
     public class BOMController : ApiController
     {
         log4net.ILog log = log4net.LogManager.GetLogger("Templet");
+
         [HttpPost]
-        [Route("CreateRoot")]
-        public void CreateRoot(string templetName, string creater)
+        [Route("Spread")]
+        public List<NodeInfo> SpreadBOM(long tmpId, int rlSeqNo)
         {
-            Templet templet = new Templet();
+            SqlConnection sqlConnection = DBConnection.OpenConnection();
+            List<NodeInfo> list = new List<NodeInfo>();
+            BOMTree bomTree = new BOMTree();
             try
             {
-                templet.CreateTemplet(templetName, creater);
+                bomTree.FindChildrenTree(sqlConnection, ref list, tmpId, rlSeqNo, 1);
             }
             catch (Exception e)
             {
-                string logMessage = string.Format($"Create root templet error!\n {e.StackTrace}");
+                string logMessage = string.Format($"Spread BOM tree error!\n {e.StackTrace}");
                 log.Error(logMessage);
                 var responseMessge = new HttpResponseMessage(HttpStatusCode.InternalServerError)
                 {
                     Content = new StringContent(logMessage),
-                    ReasonPhrase = "Create root templet ERROR"
+                    ReasonPhrase = "Create BOM Tree ERROR"
                 };
                 throw new HttpResponseException(responseMessge);
-            }      
+            }
+            return list;
         }
 
         [HttpPost]
-        [Route("CreateChild")]
-        public void CreateChildWithoutTemplet(long parentTempletId,string templetName, string creater)
+        [Route("ApplyCode")]
+        public string ApplyCode(NodeInfo nodeInfo)
         {
-            Templet templet = new Templet();
+            
+            BOMTree bomTree = new BOMTree();
             try
             {
-                templet.CreateTemplet(parentTempletId,templetName, creater);
+              return  bomTree.ApplyCode(nodeInfo);
             }
             catch (Exception e)
             {
-                string logMessage = string.Format($"Create child templet error!\n {e.StackTrace}");
+                string logMessage = string.Format($"Applay code error!\n {e.StackTrace}");
                 log.Error(logMessage);
                 var responseMessge = new HttpResponseMessage(HttpStatusCode.InternalServerError)
                 {
                     Content = new StringContent(logMessage),
-                    ReasonPhrase = "Create child templet ERROR"
+                    ReasonPhrase = "Applay code error"
                 };
                 throw new HttpResponseException(responseMessge);
             }
-        }
-
-        [HttpPost]
-        [Route("CreateWithTemplet")]
-        public void CreateCopiedTemplet(long parentTempletId, long referenceTempletId, string creater)
-        {
-            Templet templet = new Templet();
-            try
-            {
-                templet.CreateCopiedTemplet(parentTempletId, referenceTempletId, creater);
-            }
-            catch (Exception e)
-            {
-                string logMessage = string.Format($"Create child templet error!\n {e.StackTrace}");
-                log.Error(logMessage);
-                var responseMessge = new HttpResponseMessage(HttpStatusCode.InternalServerError)
-                {
-                    Content = new StringContent(logMessage),
-                    ReasonPhrase = "Create child templet ERROR"
-                };
-                throw new HttpResponseException(responseMessge);
-            }
-        }
-
-        [HttpPost]
-        [Route("Delete")]
-        public void DeleteTemplet(long parentTempletId, long TempletId, int rlSeqNo)
-        {
-            Templet templet = new Templet();
-            try
-            {
-                templet.DeleteTemplet( parentTempletId, TempletId, rlSeqNo);
-            }
-            catch (Exception e)
-            {
-                string logMessage = string.Format($"Delete templet error!\n {e.StackTrace}");
-                log.Error(logMessage);
-                var responseMessge = new HttpResponseMessage(HttpStatusCode.InternalServerError)
-                {
-                    Content = new StringContent(logMessage),
-                    ReasonPhrase = "Delete templet ERROR"
-                };
-                throw new HttpResponseException(responseMessge);
-            }
+            
         }
 
 
         [HttpPost]
-        [Route("Lock")]
-        public void LockTemplet(long templetId)
+        [Route("DeleteNode")]
+        public void DeleteNode(long pMaterielId, long materielId, int rlSeqNo)
         {
-            Templet templet = new Templet();
+
+            BOMTree bomTree = new BOMTree();
             try
             {
-                templet.LockTemplet(templetId);
+                bomTree.DeleteNode( pMaterielId, materielId, rlSeqNo);
             }
             catch (Exception e)
             {
-                string logMessage = string.Format($"Lock templet error!\n {e.StackTrace}");
+                string logMessage = string.Format($"Delete code error!\n {e.StackTrace}");
                 log.Error(logMessage);
                 var responseMessge = new HttpResponseMessage(HttpStatusCode.InternalServerError)
                 {
                     Content = new StringContent(logMessage),
-                    ReasonPhrase = "Lock templet error"
+                    ReasonPhrase = "Delete code error"
                 };
                 throw new HttpResponseException(responseMessge);
             }
+
         }
     }
 }

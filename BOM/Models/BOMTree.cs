@@ -17,8 +17,6 @@ namespace BOM.Models
             string sql = null;
             NodeInfo nodeInfo = new NodeInfo();
 
-
-
             SqlDataReader dataReader = null;
             using (SqlCommand command = new SqlCommand())
             {
@@ -84,7 +82,7 @@ namespace BOM.Models
                     {
                         while (dataReader.Read())
                         {
-                            FindChildrenTree(connection, ref list, (long)dataReader["CTmpId"], (int)dataReader["rlSeqNo"], level + 1);
+                            FindChildrenTree(connection, ref list, (long)dataReader["CTmpId"],  (int)dataReader["rlSeqNo"], level + 1);
                         }
                     }
 
@@ -99,7 +97,7 @@ namespace BOM.Models
 
         }
 
-        public void ApplyCode(NodeInfo nodeInfo)
+        public string ApplyCode(NodeInfo nodeInfo)
         {
             int result = -1;
             bool hasPrivateAttribute = false;
@@ -283,6 +281,7 @@ namespace BOM.Models
 
             }
             DBConnection.CloseConnection(sqlConnection);
+            return materielIdentification;
         }
 
         public void DeleteNode(long pMaterielId, long materielId, int rlSeqNo)

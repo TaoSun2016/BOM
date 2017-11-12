@@ -14,12 +14,13 @@ namespace BOM.Controllers
     {
         log4net.ILog log = log4net.LogManager.GetLogger("Templet");
 
-        [HttpPost]
+        [HttpGet]
         [Route("Spread")]
-        public List<NodeInfo> SpreadBOM(long tmpId, int rlSeqNo)
+        public List<NodeInfo> SpreadBOM(string tmpId, int rlSeqNo)
         {
             SqlConnection sqlConnection = DBConnection.OpenConnection();
             List<NodeInfo> list = new List<NodeInfo>();
+            
             BOMTree bomTree = new BOMTree();
             try
             {
@@ -29,6 +30,7 @@ namespace BOM.Controllers
             {
                 string logMessage = string.Format($"Spread BOM tree error!\n {e.StackTrace}");
                 log.Error(logMessage);
+                DBConnection.CloseConnection(sqlConnection);
                 var responseMessge = new HttpResponseMessage(HttpStatusCode.InternalServerError)
                 {
                     Content = new StringContent(logMessage),

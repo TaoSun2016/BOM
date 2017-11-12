@@ -28,27 +28,46 @@ namespace Test
             }
             Console.WriteLine("finished");
             */
-            // 测试数据库数据返回为空的问题
-            int i = -1;
-            SqlConnection sqlConnection = DBConnection.OpenConnection();
-            try
-            {
-                using (SqlCommand cmd = new SqlCommand("select isnull(max(rlseqno),0) from relation where tmpid='kk'", sqlConnection))
-                {
-                    i = (int)(cmd.ExecuteScalar());
+            //// 测试数据库数据返回为空的问题
+            //int i = -1;
+            //SqlConnection sqlConnection = DBConnection.OpenConnection();
+            //try
+            //{
+            //    using (SqlCommand cmd = new SqlCommand("select isnull(max(rlseqno),0) from relation where tmpid='kk'", sqlConnection))
+            //    {
+            //        i = (int)(cmd.ExecuteScalar());
 
-                }
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(e.StackTrace);
-                Console.WriteLine("error");
-            }
-            finally
-            {
-                DBConnection.CloseConnection(sqlConnection);
-            }
-            Console.WriteLine(i);
+            //    }
+            //}
+            //catch (Exception e)
+            //{
+            //    Console.WriteLine(e.StackTrace);
+            //    Console.WriteLine("error");
+            //}
+            //finally
+            //{
+            //    DBConnection.CloseConnection(sqlConnection);
+            //}
+            //Console.WriteLine(i);
+
+            c1 list = new c1();
+            list.c2s = new List<c2>();
+
+            list.c2s.Add(new c2 { id="1",name="A"});
+
+            Console.WriteLine(list.c2s[0].id);
         }
+    }
+
+    class c1
+    {
+        public int id { get; set; }
+        public List<c2> c2s { get; set; }
+    }
+
+    class c2
+    {
+        public string  id { get; set; }
+        public string  name { get; set; }
     }
 }

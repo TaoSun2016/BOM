@@ -12,16 +12,25 @@ namespace BOM.Models
         log4net.ILog log = log4net.LogManager.GetLogger("BOMTree");
 
         //Open BOM Tree
-        public void FindChildrenTree(SqlConnection connection, ref List<NodeInfo> list, long tmpId, int rlSeqNo, int level)
+        //测试暂时将tmpid设为string型
+        public void FindChildrenTree(SqlConnection connection, ref List<NodeInfo> list, string tmpId, int rlSeqNo, int level)
         {
             string sql = null;
             NodeInfo nodeInfo = new NodeInfo();
+            nodeInfo.Attributes = new List<TempletAttribute>();
+
+            List<string> listCTmpId = new List<string>();
+            List<int> listSeqNo = new List<int>();
 
             SqlDataReader dataReader = null;
+
+            log.Info("=================================================================");
+            log.Info($"tmpid = [{tmpId}] seqno=[{rlSeqNo}] level=[{level}]");
             using (SqlCommand command = new SqlCommand())
             {
                 command.Connection = connection;
-                sql = $"SELECT TmpNm FROM TmpInfo WHERE TmpId = {tmpId}";
+                //sql = $"SELECT TmpNm FROM TmpInfo WHERE TmpId = {tmpId}"';
+                sql = $"SELECT TmpNm FROM TmpInfo WHERE TmpId = '{tmpId}'";
                 command.CommandText = sql;
 
                 try
@@ -29,15 +38,16 @@ namespace BOM.Models
                     dataReader = command.ExecuteReader();
                     if (dataReader.HasRows)
                     {
+                        dataReader.Read();
                         nodeInfo.NodeLevel = level;
                         nodeInfo.TmpId = tmpId;
                         nodeInfo.TmpNm = dataReader[0].ToString();
                         nodeInfo.rlSeqNo = rlSeqNo;
+                        dataReader.Close();
                     }
                     else
                     {
                         log.Error(string.Format($"Select TmpInfo error!\nsql[{sql}]\nError"));
-                        dataReader.Close();
                         throw new Exception("No data found!");
                     }
                 }
@@ -48,7 +58,9 @@ namespace BOM.Models
                     throw;
                 }
 
-                sql = $"SELECT CASE TmpId WHEN 0 THEN 0 ELSE 1 END AS Flag, AttrId, AttrNm, AttrTp FROM AttrDefine WHERE TmpId = {tmpId} or TmpId = 0";
+                //Flag :0 default attribute 1 private attribute
+                //sql = $"SELECT CASE TmpId WHEN 0 THEN 0 ELSE 1 END AS Flag, AttrId, AttrNm, AttrTp FROM AttrDefine WHERE TmpId = {tmpId} or TmpId = 0";
+                sql = $"SELECT CASE TmpId WHEN '0' THEN '0' ELSE '1' END AS Flag, AttrId, AttrNm, AttrTp FROM AttrDefine WHERE TmpId = '{tmpId}' or TmpId = '0'";
                 command.CommandText = sql;
 
                 try
@@ -56,7 +68,12 @@ namespace BOM.Models
                     dataReader = command.ExecuteReader();
                     while (dataReader.Read())
                     {
-                        nodeInfo.Attributes.Add(new TempletAttribute { Flag = (int)dataReader["Flag"], Id = dataReader["AttrId"].ToString(), Name = dataReader["AttrNm"].ToString(), Type = dataReader["AttrTp"].ToString() });
+                        var v1 = dataReader["Flag"].ToString();
+                        var v2 = dataReader["AttrId"].ToString();
+                        var v3 = dataReader["AttrNm"].ToString();
+                        var v4 = dataReader["AttrTp"].ToString();
+
+                        nodeInfo.Attributes.Add(new TempletAttribute { Flag = dataReader["Flag"].ToString(), Id = dataReader["AttrId"].ToString(), Name = dataReader["AttrNm"].ToString(), Type = dataReader["AttrTp"].ToString(), Value = "" });
                     }
                 }
                 catch (Exception e)
@@ -68,7 +85,8 @@ namespace BOM.Models
                 dataReader.Close();
                 list.Add(nodeInfo);
 
-                sql = $"SELECT CTmpId, rlSeqNo FROM Relation WHERE TmpId = {tmpId} ORDER BY CTmpId, rlSeqNo";
+                //sql = $"SELECT CTmpId, rlSeqNo FROM Relation WHERE TmpId = {tmpId} ORDER BY CTmpId, rlSeqNo";
+                sql = $"SELECT CTmpId, rlSeqNo FROM Relation WHERE TmpId = '{tmpId}' ORDER BY CTmpId, rlSeqNo";
                 command.CommandText = sql;
 
                 try
@@ -76,14 +94,19 @@ namespace BOM.Models
                     dataReader = command.ExecuteReader();
                     if (!dataReader.HasRows)
                     {
+                        dataReader.Close();
                         return;
                     }
                     else
                     {
+
                         while (dataReader.Read())
                         {
-                            FindChildrenTree(connection, ref list, (long)dataReader["CTmpId"],  (int)dataReader["rlSeqNo"], level + 1);
+                            listCTmpId.Add(dataReader["CTmpId"].ToString());
+                            listSeqNo.Add(Convert.ToInt32(dataReader["rlSeqNo"].ToString()));
+                                         
                         }
+                        dataReader.Close();                       
                     }
 
                 }
@@ -92,6 +115,11 @@ namespace BOM.Models
                     log.Error(string.Format($"Select AttrDefine error!\nsql[{sql}]\nError[{e.StackTrace}]"));
                     dataReader.Close();
                     throw;
+                }
+
+                for (int i = 0; i < listCTmpId.Count(); i++)
+                {
+                    FindChildrenTree(connection, ref list, listCTmpId[i], listSeqNo[i], level + 1);
                 }
             }
 
@@ -113,7 +141,7 @@ namespace BOM.Models
                 command.Transaction = sqlTransaction;
 
                 //If nodeInfo has private attribute
-                var privateAttributes = nodeInfo.Attributes.Where(m => m.Flag == 1);
+                var privateAttributes = nodeInfo.Attributes.Where(m => m.Flag == "1");
                 hasPrivateAttribute = (privateAttributes.Count() > 0);
                 if (hasPrivateAttribute)
                 {
@@ -250,7 +278,7 @@ namespace BOM.Models
                 //前台必须给所有的缺省属性赋值,没有值赋缺省值
                 insertBuilder = new StringBuilder($"INSERT INTO DeafaultAttr (");
                 insertValues = new StringBuilder($" ) VALUES (");
-                var defaultAttributes = nodeInfo.Attributes.Where(m => m.Flag == 0);
+                var defaultAttributes = nodeInfo.Attributes.Where(m => m.Flag == "0");
                 foreach (var defaultAttrbute in defaultAttributes)
                 {
                     insertBuilder.Append($" {defaultAttrbute.Id},");
@@ -318,7 +346,7 @@ namespace BOM.Models
         }
         public List<NodeInfo> Expand(NodeInfo node)
         {
-
+            return new List<NodeInfo>();
         }
 
         public void Save(List<NodeInfo> nodes)
@@ -330,7 +358,7 @@ namespace BOM.Models
     public class NodeInfo
     {
         public int NodeLevel { get; set; }
-        public long TmpId { get; set; }
+        public string TmpId { get; set; }
         public string TmpNm { get; set; }
         public int rlSeqNo { get; set; }
         public List<TempletAttribute> Attributes { get; set; }
@@ -339,7 +367,7 @@ namespace BOM.Models
     public class TempletAttribute
     {
         //0:缺省属性 1:私有属性
-        public int Flag { get; set; }
+        public string Flag { get; set; }
         public string Id { get; set; }
         public string Name { get; set; }
         public string Type { get; set; }

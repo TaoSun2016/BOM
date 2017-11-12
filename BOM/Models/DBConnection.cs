@@ -8,7 +8,8 @@ namespace BOM.Models
         public static SqlConnection OpenConnection()
         {
             
-            SqlConnection DBConnection =  new SqlConnection { ConnectionString = ConfigurationManager.ConnectionStrings["BOMDB"].ToString() };
+            //SqlConnection DBConnection =  new SqlConnection { ConnectionString = ConfigurationManager.ConnectionStrings["BOMDB"].ToString() };
+            SqlConnection DBConnection = new SqlConnection { ConnectionString = ConfigurationManager.ConnectionStrings["MAT"].ToString() };
             DBConnection.Open();
             return DBConnection;
         }

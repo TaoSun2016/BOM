@@ -38,6 +38,7 @@ namespace BOM.Controllers
                 };
                 throw new HttpResponseException(responseMessge);
             }
+            DBConnection.CloseConnection(sqlConnection);
             return list;
         }
 
@@ -53,7 +54,7 @@ namespace BOM.Controllers
             }
             catch (Exception e)
             {
-                string logMessage = string.Format($"Applay code error!\n {e.StackTrace}");
+                string logMessage = string.Format($"Applay code error!\n {e.StackTrace}[{e}][{e.Message}]");
                 log.Error(logMessage);
                 var responseMessge = new HttpResponseMessage(HttpStatusCode.InternalServerError)
                 {

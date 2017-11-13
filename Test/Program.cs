@@ -51,18 +51,41 @@ namespace Test
             //Console.WriteLine(i);
 
             c1 list = new c1();
-            list.c2s = new List<c2>();
+            list.c1s = new List<c1>();
 
-            list.c2s.Add(new c2 { id="1",name="A"});
+            list.id = 1;
+            list.c1s.Add(new c1 ());
 
-            Console.WriteLine(list.c2s[0].id);
+
+            //测试databasereader
+            int i = -1;
+            SqlConnection sqlConnection = DBConnection.OpenConnection();
+            try
+            {
+                using (SqlCommand cmd = new SqlCommand("select * from seq_no where ind_key='T2'", sqlConnection))
+                {
+                    i = (int)(cmd.ExecuteScalar());
+
+                }
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.StackTrace);
+                Console.WriteLine("error");
+            }
+            finally
+            {
+                DBConnection.CloseConnection(sqlConnection);
+            }
+            Console.WriteLine(i);
+
         }
     }
 
     class c1
     {
         public int id { get; set; }
-        public List<c2> c2s { get; set; }
+        public List<c1> c1s { get; set; }
     }
 
     class c2

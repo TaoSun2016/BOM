@@ -60,7 +60,7 @@ namespace BOM.Models
 
                 //Flag :0 default attribute 1 private attribute
                 //sql = $"SELECT CASE TmpId WHEN 0 THEN 0 ELSE 1 END AS Flag, AttrId, AttrNm, AttrTp FROM AttrDefine WHERE TmpId = {tmpId} or TmpId = 0";
-                sql = $"SELECT CASE TmpId WHEN '0' THEN '0' ELSE '1' END AS Flag, AttrId, AttrNm, AttrTp FROM AttrDefine WHERE TmpId = '{tmpId}' or TmpId = '0'";
+                sql = $"SELECT CASE TmpId WHEN '0' THEN '0' ELSE '1' END AS Flag, AttrId, AttrNm, AttrTp FROM AttrDefine WHERE TmpId = '{tmpId}' or TmpId = '0' ORDER BY FLAG, AttrId";
                 command.CommandText = sql;
 
                 try
@@ -68,10 +68,10 @@ namespace BOM.Models
                     dataReader = command.ExecuteReader();
                     while (dataReader.Read())
                     {
-                        var v1 = dataReader["Flag"].ToString();
-                        var v2 = dataReader["AttrId"].ToString();
-                        var v3 = dataReader["AttrNm"].ToString();
-                        var v4 = dataReader["AttrTp"].ToString();
+                        //var v1 = dataReader["Flag"].ToString();
+                        //var v2 = dataReader["AttrId"].ToString();
+                        //var v3 = dataReader["AttrNm"].ToString();
+                        //var v4 = dataReader["AttrTp"].ToString();
 
                         nodeInfo.Attributes.Add(new TempletAttribute { Flag = dataReader["Flag"].ToString(), Id = dataReader["AttrId"].ToString(), Name = dataReader["AttrNm"].ToString(), Type = dataReader["AttrTp"].ToString(), Value = "" });
                     }
@@ -135,14 +135,15 @@ namespace BOM.Models
             StringBuilder insertValues = new StringBuilder($" ) VALUES (");
             SqlConnection sqlConnection = DBConnection.OpenConnection();
             SqlTransaction sqlTransaction = sqlConnection.BeginTransaction();
+            SqlDataReader dataReader = null;
             using (SqlCommand command = new SqlCommand())
             {
                 command.Connection = sqlConnection;
                 command.Transaction = sqlTransaction;
 
                 //If nodeInfo has private attribute
-                var privateAttributes = nodeInfo.Attributes.Where(m => m.Flag == "1");
-                hasPrivateAttribute = (privateAttributes.Count() > 0);
+                var privateAttributesCount = nodeInfo.Attributes.Where(m => m.Flag == "1").Count();
+                hasPrivateAttribute = (privateAttributesCount > 0);
                 if (hasPrivateAttribute)
                 {
                     //Check if the private attribute table exists
@@ -166,15 +167,26 @@ namespace BOM.Models
                     }
 
                     //Check duplicated records
-                    StringBuilder builder = new StringBuilder($"SELECT COUNT(*) FROM '{nodeInfo.TmpId}' WHERE");
+                    StringBuilder builder = new StringBuilder($"SELECT COUNT(*) FROM {nodeInfo.TmpId} WHERE");
 
                     int counter = 0;
+                    var privateAttributes = nodeInfo.Attributes.Where(m => m.Flag == "1");
                     foreach (var attrbute in privateAttributes)
                     {
                         counter++;
-                        builder.Append($" {attrbute.Id} = {attrbute.Value}");
-                        insertBuilder.Append($" {attrbute.Id},");
-                        insertValues.Append($" '{attrbute.Value}',");
+                        if (attrbute.Type == "C")
+                        {
+                            builder.Append($" {attrbute.Id} = '{attrbute.Value}'");
+                            insertBuilder.Append($" {attrbute.Id},");
+                            insertValues.Append($" '{attrbute.Value}',");
+                        }
+                        else
+                        {
+                            builder.Append($" {attrbute.Id} = {attrbute.Value}");
+                            insertBuilder.Append($" {attrbute.Id},");
+                            insertValues.Append($" {attrbute.Value},");
+                        }
+                        
                         if (counter != privateAttributes.Count())
                         {
                             builder.Append($" AND");
@@ -203,18 +215,21 @@ namespace BOM.Models
 
                 //Get Materiel Identification
 
-                sql = $"SELECT * FROM SEQ_NO WHERE Ind_Key = '{nodeInfo.TmpId}'";
+                sql = $"SELECT NEXT_NO FROM SEQ_NO WHERE Ind_Key = '{nodeInfo.TmpId}'";
 
                 try
                 {
-                    SqlDataReader dataReader = command.ExecuteReader();
+                    command.CommandText = sql;
+                    dataReader = command.ExecuteReader();
 
                     if (dataReader.HasRows)
                     {
                         dataReader.Read();
 
+                        var tmp = dataReader[0];
 
-                        long nextNo = (long)dataReader["NEXT_NO"];
+
+                        long nextNo = Convert.ToInt64(dataReader[0].ToString());
 
                         dataReader.Close();
 
@@ -225,8 +240,6 @@ namespace BOM.Models
                     else
                     {
                         log.Error(string.Format($"Can't find record in table SEQ_NO.[{sql}]"));
-                        dataReader.Close();
-                        DBConnection.CloseConnection(sqlConnection);
                         throw new Exception(string.Format($"Can't find record in table SEQ_NO.[{sql}]"));
                     }
 
@@ -239,19 +252,19 @@ namespace BOM.Models
                         throw new Exception($"No record is updated,TmpID=[{nodeInfo.TmpId}]");
                     }
                 }
-                catch
+                catch (Exception e)
                 {
-                    log.Error($"Get MaterielIdentification Error,TmpID=[{nodeInfo.TmpId}]sql=[{sql}]");
+                    log.Error($"Get MaterielIdentification Error,TmpID=[{nodeInfo.TmpId}]sql=[{sql}]error[{e.StackTrace}][{e}][{e.Message}]");
+                    dataReader.Close();
                     sqlTransaction.Rollback();
                     DBConnection.CloseConnection(sqlConnection);
                     throw;
                 }
 
-
                 //Register private attribute values
                 if (hasPrivateAttribute)
                 {
-                    sql = insertBuilder.ToString() + $" materielIdentification)" + insertValues.ToString() + $" {materielIdentification}";
+                    sql = insertBuilder.ToString() + $" materielIdentfication" + insertValues.ToString() + $" '{materielIdentification}')";
 
                     command.CommandText = sql;
                     try
@@ -282,9 +295,16 @@ namespace BOM.Models
                 foreach (var defaultAttrbute in defaultAttributes)
                 {
                     insertBuilder.Append($" {defaultAttrbute.Id},");
-                    insertValues.Append($" '{defaultAttrbute.Value}',");
+                    if (defaultAttrbute.Type == "C")
+                    {
+                        insertValues.Append($" '{defaultAttrbute.Value}',");
+                    }
+                    else
+                    {
+                        insertValues.Append($" {defaultAttrbute.Value},");
+                    }                 
                 }
-                sql = insertBuilder.ToString() + $" materielIdentification)" + insertValues.ToString() + $" {materielIdentification}";
+                sql = insertBuilder.ToString() + $" materielIdentfication" + insertValues.ToString() + $" '{materielIdentification}')";
 
                 command.CommandText = sql;
                 try
@@ -305,6 +325,7 @@ namespace BOM.Models
                     DBConnection.CloseConnection(sqlConnection);
                     throw new Exception("No default attrbutes is registered!");
                 }
+                
                 sqlTransaction.Commit();
 
             }
@@ -322,7 +343,7 @@ namespace BOM.Models
             using (SqlCommand command = new SqlCommand())
             {
                 command.Connection = sqlConnection;
-                sql = $"DELETE FROM BOM WHERE materielIdentification = {pMaterielId} AND CmId = {materielId} and rlSeqNo = {rlSeqNo}";
+                sql = $"DELETE FROM BOM WHERE materielIdentfication = '{pMaterielId}' AND CmId = '{materielId}' and rlSeqNo = {rlSeqNo}";
                 command.CommandText = sql;
                 try
                 {
@@ -362,6 +383,11 @@ namespace BOM.Models
         public string TmpNm { get; set; }
         public int rlSeqNo { get; set; }
         public List<TempletAttribute> Attributes { get; set; }
+
+        public NodeInfo()
+        {
+            Attributes = new List<TempletAttribute>();
+        }
     }
 
     public class TempletAttribute

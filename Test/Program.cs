@@ -50,34 +50,58 @@ namespace Test
             //}
             //Console.WriteLine(i);
 
-            c1 list = new c1();
-            list.c1s = new List<c1>();
+            //c1 list = new c1();
+            //list.c1s = new List<c1>();
 
-            list.id = 1;
-            list.c1s.Add(new c1 ());
+            //list.id = 1;
+            //list.c1s.Add(new c1 ());
 
 
             //测试databasereader
-            int i = -1;
-            SqlConnection sqlConnection = DBConnection.OpenConnection();
-            try
-            {
-                using (SqlCommand cmd = new SqlCommand("select * from seq_no where ind_key='T2'", sqlConnection))
-                {
-                    i = (int)(cmd.ExecuteScalar());
+            //int i = -1;
+            //SqlConnection sqlConnection = DBConnection.OpenConnection();
+            //try
+            //{
+            //    using (SqlCommand cmd = new SqlCommand("select * from seq_no where ind_key='T2'", sqlConnection))
+            //    {
+            //        i = (int)(cmd.ExecuteScalar());
 
-                }
-            }
-            catch (Exception e)
+            //    }
+            //}
+            //catch (Exception e)
+            //{
+            //    Console.WriteLine(e.StackTrace);
+            //    Console.WriteLine("error");
+            //}
+            //finally
+            //{
+            //    DBConnection.CloseConnection(sqlConnection);
+            //}
+            //Console.WriteLine(i);
+
+
+            //
+            BOMNode node = new BOMNode();
+            node.id = 1;
+
+            BOMNode node1 = new BOMNode();
+            node1.id = 2;
+            node.nodes.Add(node1);
+            node.nodes.Add(new BOMNode());
+
+
+
+                Console.WriteLine(node.id  );
+                Console.WriteLine(node.nodes[0].id);
+            Console.WriteLine(node.nodes[1].id);
+            foreach (var aa in node.nodes)
             {
-                Console.WriteLine(e.StackTrace);
-                Console.WriteLine("error");
+                aa.id += 1;
             }
-            finally
-            {
-                DBConnection.CloseConnection(sqlConnection);
-            }
-            Console.WriteLine(i);
+            //node.nodes.Find(m => m.id == 0).id = 8;
+            Console.WriteLine(node.id);
+            Console.WriteLine(node.nodes[0].id);
+            Console.WriteLine(node.nodes[1].id);
 
         }
     }
@@ -92,5 +116,16 @@ namespace Test
     {
         public string  id { get; set; }
         public string  name { get; set; }
+    }
+
+
+    class BOMNode
+    {
+        public int id { get; set; }
+        public List<BOMNode> nodes { get; set; }
+        public BOMNode() {
+            this.id = 0;
+            this.nodes = new List<BOMNode>();
+        }
     }
 }

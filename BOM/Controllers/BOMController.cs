@@ -16,7 +16,7 @@ namespace BOM.Controllers
 
         [HttpGet]
         [Route("Spread")]
-        public List<NodeInfo> SpreadBOM(string tmpId, int rlSeqNo)
+        public List<NodeInfo> SpreadBOM(string pTmpId, string tmpId, int rlSeqNo)
         {
             SqlConnection sqlConnection = DBConnection.OpenConnection();
             List<NodeInfo> list = new List<NodeInfo>();
@@ -24,7 +24,7 @@ namespace BOM.Controllers
             BOMTree bomTree = new BOMTree();
             try
             {
-                bomTree.FindChildrenTree(sqlConnection, ref list, tmpId, rlSeqNo, 1);
+                bomTree.FindChildrenTree(sqlConnection, ref list, pTmpId, tmpId, rlSeqNo, 1);
             }
             catch (Exception e)
             {

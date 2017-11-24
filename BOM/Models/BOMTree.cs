@@ -380,24 +380,7 @@ namespace BOM.Models
         }
 
 
-        public List<NodeInfo> Expand(NodeInfo node)
-        {
-            if (string.IsNullOrEmpty(node.MaterielId))
-            {
-                //对该节点作申请编码
-            }
-
-            //递归调用方法:保存当前节点信息,查找子节点列表,根据当前节点属性值生成子节点属性值
-
-            //
-
-
-
-
-            return new List<NodeInfo>();
-        }
-
-        public bool CreateBOMTree(ref List<NodeInfo> list, NodeInfo node, int level)
+        public void CreateBOMTree(ref List<NodeInfo> list, NodeInfo node, int level)
         {
             string sql = null;
             NodeInfo child = new NodeInfo();
@@ -428,6 +411,7 @@ namespace BOM.Models
                     string cTmpId = listCtmpId[i];
                     int cSeqNo = listSeqNo[i];
 
+                    //查询子节点模板信息,部分子节点属性赋值
                     sql = $"SELECT TmpNm FROM TmpInfo WHERE TmpId = '{cTmpId}'";
                     command.CommandText = sql;
 
@@ -474,24 +458,23 @@ namespace BOM.Models
                     catch (Exception e)
                     {
                         log.Error(string.Format($"Select AttrDefine error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                        reader.Close();
                         throw;
                     }
-                    reader.Close();
+                    finally
+                    {
+                        reader.Close();
+                    }
+
                     GetChildAttributeValues(node, child);
+                    CreateBOMTree(ref list, child, level + 1);
                 }
 
             }
             else
             {
                 reader.Close();
-                return true;
+                return;
             }
-
-
-
-
-            return true;
         }
 
 
@@ -517,9 +500,10 @@ namespace BOM.Models
 
             string sql = "";
             string defaultValue = "";
-            bool verified = true; //同样Valuetype的记录,如果上一条验证通过则为true
+            bool verified = true; //同样Valuetype的记录,如果上一条验证通过则为true,有一条验证不过就是false.
             bool found = false; //是否找到匹配记录
 
+            //逐个计算子节点属性值
             foreach (var attribute in cNode.Attributes)
             {
                 sql = $"SELECT CAttrID,CAttrValue,ValueType,PAttrId,Gt,Lt,Eq,Excld,Gteq,Lteq FROM AttrPass WHERE TmpId = '{pNode.TmpId}' and CTmpId = '{cNode.TmpId}' AND rlSeqNo = '{cNode.rlSeqNo} AND CAttrId = '{attribute.Id}' ORDER BY ValueType";
@@ -548,7 +532,7 @@ namespace BOM.Models
                         }
                         //初始化属性取值
                         verified = true;
-                        origAttrValue = "";
+                        origAttrValue = cAttrValue;
                         origValueType = valueType;
                     }
                  
@@ -673,14 +657,15 @@ namespace BOM.Models
                         {
                             var gtValue = Convert.ToDecimal(gt);
                             var ltValue = Convert.ToDecimal(lt);
-                            found = false;
+                            found = true;
                             if (ltValue > gtValue)//此时应判断父属性值大于gtValue并且小于ltValue
                             {
+                                //gteq == "1' 表示使用>=判断gt的值,否则使用>判断gt的值. lteq同样处理
                                 if (gteq == "1") //pAttrValue >= gtValue
                                 {
                                     if (pAttrValue - gtValue > -0.005m)
                                     {
-                                        found = true;
+                                        //found = true;
                                     }
                                     else
                                     {
@@ -691,7 +676,7 @@ namespace BOM.Models
                                 {
                                     if (pAttrValue - gtValue > 0)
                                     {
-                                        found = true;
+                                        //found = true;
                                     }
                                     else
                                     {
@@ -703,7 +688,7 @@ namespace BOM.Models
                                 {
                                     if (pAttrValue - gtValue < 0.005m)
                                     {
-                                        found = true;
+                                        //found = true;
                                     }
                                     else
                                     {
@@ -714,7 +699,7 @@ namespace BOM.Models
                                 {
                                     if (pAttrValue - gtValue < 0)
                                     {
-                                        found = true;
+                                        //found = true;
                                     }
                                     else
                                     {
@@ -734,7 +719,7 @@ namespace BOM.Models
                                 {
                                     if (pAttrValue - gtValue > -0.005m)
                                     {
-                                        found = true;
+                                        //found = true;
                                     }
                                     else
                                     {
@@ -745,7 +730,7 @@ namespace BOM.Models
                                 {
                                     if (pAttrValue - gtValue > 0)
                                     {
-                                        found = true;
+                                        //found = true;
                                     }
                                     else
                                     {
@@ -762,7 +747,7 @@ namespace BOM.Models
                                 {
                                     if (pAttrValue - gtValue < 0.005m)
                                     {
-                                        found = true;
+                                        //found = true;
                                     }
                                     else
                                     {
@@ -773,7 +758,7 @@ namespace BOM.Models
                                 {
                                     if (pAttrValue - gtValue < 0)
                                     {
-                                        found = true;
+                                        //found = true;
                                     }
                                     else
                                     {
@@ -804,7 +789,7 @@ namespace BOM.Models
                                     }
                                     else
                                     {
-                                        found = false;
+                                        //found = false;
                                     }
                                 }
                                 else  //pAttrValue > gtValue
@@ -815,7 +800,7 @@ namespace BOM.Models
                                     }
                                     else
                                     {
-                                        found = false;
+                                        //found = false;
                                     }
                                 }
                                 if (found)
@@ -837,7 +822,7 @@ namespace BOM.Models
                                     }
                                     else
                                     {
-                                        found = false;
+                                        //found = false;
                                     }
                                 }
                                 else  //pAttrValue < ltValue
@@ -848,7 +833,7 @@ namespace BOM.Models
                                     }
                                     else
                                     {
-                                        found = false;
+                                        //found = false;
                                     }
                                 }
                                 if (found)
@@ -860,10 +845,9 @@ namespace BOM.Models
                         }
                     }
                     verified = false;
-
                 }
 
-                //如果根据父节点属性无法计算子节点属性值,则赋缺省值
+                //如果根据父节点属性无法计算子节点属性值,并且子节点属性有缺省值,则赋缺省值
                 if (values.Count == 0 && !string.IsNullOrEmpty(defaultValue))
                 {
                     values.Add(defaultValue);

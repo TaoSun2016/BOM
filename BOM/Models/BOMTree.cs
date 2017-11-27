@@ -482,7 +482,6 @@ namespace BOM.Models
             int valueTpCount = 0;
 
             string origValueType = "";
-            string origAttrValue = "";
 
             string cAttrId = "";
             string CAttrType = "";
@@ -933,11 +932,11 @@ namespace BOM.Models
                 return command.ExecuteScalar().ToString();
             }
         }
-        public void SaveBOMTree(List<NodeInfo> nodes, NodeInfo node)
+        public void SaveBOMTree(List<NodeInfo> nodes, NodeInfo node, decimal count)
         {
             List<NodeInfo> childList = new List<NodeInfo>();
 
-            SaveNode(node);
+            SaveNode(node, count);
             childList = nodes.Where(m => m.PTmpId == node.TmpId).ToList<NodeInfo>();
             if (childList.Count == 0)
             {
@@ -947,12 +946,12 @@ namespace BOM.Models
             {
                 foreach (var childnode in childList)
                 {
-                    SaveBOMTree(nodes, childnode);
+                    SaveBOMTree(nodes, childnode, count);
                 }
             }
         }
 
-        public bool SaveNode(NodeInfo node)
+        public bool SaveNode(NodeInfo node, decimal count)
         {
             int result = -1;
             bool hasPrivateAttribute = false;
@@ -1189,8 +1188,11 @@ namespace BOM.Models
             }
 
 
-            //登记表BOM 
-            sql = $"INSERT INTO BOM VALUES ('{node.pMaterielId}','{node.PTmpId}','{node.materielId}','{node.TmpId}','{node.Count}',{node.rlSeqNo},{node.pMaterielId})";
+            //登记表BOM
+            //获取数量
+            var totalAmount = Convert.ToDecimal(node.Attributes.Find(m => m.Id == "_danyl").Values[0]) * count;
+
+            sql = $"INSERT INTO BOM VALUES ('{node.pMaterielId}','{node.PTmpId}','{node.materielId}','{node.TmpId}','{totalAmount}',{node.rlSeqNo},{node.pMaterielId})";
 
             try
             {

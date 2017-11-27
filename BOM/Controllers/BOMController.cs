@@ -90,5 +90,76 @@ namespace BOM.Controllers
             }
 
         }
+
+        [HttpPost]
+        [Route("CreateBOM")]
+        public List<NodeInfo> CreateBOM(NodeInfo node)
+        {
+            SqlConnection sqlConnection = DBConnection.OpenConnection();
+            SqlCommand command = new SqlCommand();
+            SqlTransaction transaction = sqlConnection.BeginTransaction();
+            List<NodeInfo> list = new List<NodeInfo>;
+
+            BOMTree bomTree = new BOMTree(sqlConnection,command,transaction);
+
+
+            try
+            {
+                bomTree.CreateBOMTree(ref list, node, node.NodeLevel);
+                return list;
+            }
+            catch (Exception e)
+            {
+                string logMessage = string.Format($"Create BOM Tree error!\n {e.StackTrace}");
+                log.Error(logMessage);
+                var responseMessge = new HttpResponseMessage(HttpStatusCode.InternalServerError)
+                {
+                    Content = new StringContent(logMessage),
+                    ReasonPhrase = "Create BOM Tree error!"
+                };
+                throw new HttpResponseException(responseMessge);
+            }
+            finally
+            {
+                command.Dispose();
+                DBConnection.CloseConnection(sqlConnection);
+            }
+
+        }
+
+        [HttpPost]
+        [Route("SaveBOM")]
+        public void SaveBOM(decimal count, List<NodeInfo> list)
+        {
+            SqlConnection sqlConnection = DBConnection.OpenConnection();
+            SqlCommand command = new SqlCommand();
+            SqlTransaction transaction = sqlConnection.BeginTransaction();
+            NodeInfo node = list.Find(m => m.NodeLevel == 1);
+
+            BOMTree bomTree = new BOMTree(sqlConnection, command, transaction);
+
+
+            try
+            {
+                bomTree.SaveBOMTree(list, node, count);
+            }
+            catch (Exception e)
+            {
+                string logMessage = string.Format($"Save BOM Tree error!\n {e.StackTrace}");
+                log.Error(logMessage);
+                var responseMessge = new HttpResponseMessage(HttpStatusCode.InternalServerError)
+                {
+                    Content = new StringContent(logMessage),
+                    ReasonPhrase = "Save BOM Tree error!"
+                };
+                throw new HttpResponseException(responseMessge);
+            }
+            finally
+            {
+                command.Dispose();
+                DBConnection.CloseConnection(sqlConnection);
+            }
+
+        }
     }
 }

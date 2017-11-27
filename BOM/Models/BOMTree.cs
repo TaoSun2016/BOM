@@ -933,9 +933,23 @@ namespace BOM.Models
                 return command.ExecuteScalar().ToString();
             }
         }
-        public void SaveBOMTree(List<NodeInfo> nodes)
+        public void SaveBOMTree(List<NodeInfo> nodes, NodeInfo node)
         {
+            List<NodeInfo> childList = new List<NodeInfo>();
 
+            SaveNode(node);
+            childList = nodes.Where(m => m.PTmpId == node.TmpId).ToList<NodeInfo>();
+            if (childList.Count == 0)
+            {
+                return;
+            }
+            else
+            {
+                foreach (var childnode in childList)
+                {
+                    SaveBOMTree(nodes, childnode);
+                }
+            }
         }
 
         public bool SaveNode(NodeInfo node)
@@ -1125,15 +1139,71 @@ namespace BOM.Models
 
                     throw new Exception("No default attrbutes is registered!");
                 }
+                node.MaterielId = materielIdentification;
             }
 
 
+
             //生成DCM码
+            int dcm = 0;
+            sql = $"SELECT DCM FROM TmpInfo WHERE TmpId = '{node.TmpId}'";
+
+            try
+            {
+                command.CommandText = sql;
+                dataReader = command.ExecuteReader();
+
+                if (dataReader.HasRows)
+                {
+                    dataReader.Read();
+
+                    dcm = (int)dataReader[0];
+                    dataReader.Close();
+
+                    if (dcm == 0 || dcm < node.NodeLevel)
+                    {
+                        sql = $"UPDATE TmpInfo SET DCM = {node.NodeLevel} WHERE TmpId = '{node.TmpId}'";
+                        command.CommandText = sql;
+                        result = command.ExecuteNonQuery();
+                        if (result == 0)
+                        {
+                            log.Error($"No record is updated in TmpInfo,TmpID=[{node.TmpId}]");
+
+                            throw new Exception($"No record is updated in TmpInfo,TmpID=[{node.TmpId}]");
+                        }
+                    }
 
 
+                }
+                else
+                {
+                    log.Error(string.Format($"Can't find record in table TmpInfo.[{sql}]"));
+                    throw new Exception(string.Format($"Can't find record in table TmpInfo.[{sql}]"));
+                }
+            }
+            catch (Exception e)
+            {
+                log.Error($"Update DCM Error,TmpID=[{node.TmpId}]sql=[{sql}]error[{e.StackTrace}][{e}][{e.Message}]");
+                dataReader.Close();
+                throw;
+            }
 
 
+            //登记表BOM 
+            sql = $"INSERT INTO BOM VALUES ('{node.pMaterielId}','{node.PTmpId}','{node.materielId}','{node.TmpId}','{node.Count}',{node.rlSeqNo},{node.pMaterielId})";
 
+            try
+            {
+                command.CommandText = sql;
+                result = command.ExecuteNonQuery();
+
+            }
+            catch (Exception e)
+            {
+                log.Error($"Insert BOM Error,sql=[{sql}]error[{e.StackTrace}][{e}][{e.Message}]");
+                throw;
+
+            }
             return true;
         }
 
@@ -1142,10 +1212,12 @@ namespace BOM.Models
     {
         public int NodeLevel { get; set; }
         public string PTmpId { get; set; }
+        public string pMaterielId { get; set; }
         public string TmpId { get; set; }
         public string TmpNm { get; set; }
+        public string materielId { get; set; }
         public int rlSeqNo { get; set; }
-
+        public decimal Count { get; set; }
         public string MaterielId { get; set; }
         public List<TempletAttribute> Attributes { get; set; }
 

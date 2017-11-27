@@ -81,27 +81,61 @@ namespace Test
 
 
             //
-            BOMNode node = new BOMNode();
-            node.id = 1;
+            //BOMNode node = new BOMNode();
+            //node.id = 1;
 
-            BOMNode node1 = new BOMNode();
-            node1.id = 2;
-            node.nodes.Add(node1);
-            node.nodes.Add(new BOMNode());
+            //BOMNode node1 = new BOMNode();
+            //node1.id = 2;
+            //node.nodes.Add(node1);
+            //node.nodes.Add(new BOMNode());
 
 
 
-                Console.WriteLine(node.id  );
-                Console.WriteLine(node.nodes[0].id);
-            Console.WriteLine(node.nodes[1].id);
-            foreach (var aa in node.nodes)
+            //    Console.WriteLine(node.id  );
+            //    Console.WriteLine(node.nodes[0].id);
+            //Console.WriteLine(node.nodes[1].id);
+            //foreach (var aa in node.nodes)
+            //{
+            //    aa.id += 1;
+            //}
+            ////node.nodes.Find(m => m.id == 0).id = 8;
+            //Console.WriteLine(node.id);
+            //Console.WriteLine(node.nodes[0].id);
+            //Console.WriteLine(node.nodes[1].id);
+
+            //test string split method
+            //string stringTest = "aaa-a+b*c/d";
+            //var result = stringTest.Split('+', '-', '*', '/');
+            //foreach (var i in result)
+            //{
+            //    Console.WriteLine("[" + i + "]");
+
+            //}
+
+
+            //测试利用数据库计算表达式
+            SqlConnection sqlConnection = DBConnection.OpenConnection();
+            try
             {
-                aa.id += 1;
+                string sql = "(9*2+3*2)/7";
+                using (SqlCommand cmd = new SqlCommand())
+                {
+                    cmd.Connection = sqlConnection;
+                    cmd.CommandText = $"select {sql} as result";
+                    string i = cmd.ExecuteScalar().ToString();
+                    Console.WriteLine( "["+i+"]");
+
+                }
             }
-            //node.nodes.Find(m => m.id == 0).id = 8;
-            Console.WriteLine(node.id);
-            Console.WriteLine(node.nodes[0].id);
-            Console.WriteLine(node.nodes[1].id);
+            catch (Exception e)
+            {
+                Console.WriteLine(e.StackTrace);
+                Console.WriteLine("error");
+            }
+            finally
+            {
+                DBConnection.CloseConnection(sqlConnection);
+            }
 
         }
     }

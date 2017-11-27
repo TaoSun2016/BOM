@@ -155,8 +155,7 @@ namespace BOM.Models
                 command.Transaction = sqlTransaction;
 
                 //If nodeInfo has private attribute
-                var privateAttributesCount = nodeInfo.Attributes.Where(m => m.Flag == "1").Count();
-                hasPrivateAttribute = (privateAttributesCount > 0);
+                hasPrivateAttribute = nodeInfo.Attributes.Where(m => m.Flag == "1").Count() > 0;
                 if (hasPrivateAttribute)
                 {
                     //Check if the private attribute table exists
@@ -534,14 +533,14 @@ namespace BOM.Models
                     {
                         if (verified)
                         {
-                            values.Union(midValues);                          
+                            values.Union(midValues);
                         }
                         //初始化属性取值
                         verified = true;
                         midValues.Clear();
                         origValueType = valueType;
                     }
-                 
+
                     //属性的缺省值,在此循环中只保留值,不作处理
                     if (valueType == "0")
                     {
@@ -549,7 +548,7 @@ namespace BOM.Models
                         continue;
                     }
 
-                    valueTpCount ++;
+                    valueTpCount++;
 
                     //如果同组valuetype中有验证不过的,则该组valuetype后续记录都跳过
                     if (!verified)
@@ -602,7 +601,7 @@ namespace BOM.Models
                                 }
                                 if (found)
                                 {
-                                    
+
                                     midValues.Add(CalculateAttrbuteValue(pNode, CAttrType, cAttrValue));
                                     foundNum++;
                                     continue;
@@ -615,14 +614,15 @@ namespace BOM.Models
                             continue;
                         }
 
-                        
 
-                       
+
+
                     }
                     else//父属性是数字型,数字型需要判断相等,不等和大于小于
                     {
                         foundNum = 0;
-                        foreach (var pValue in attr.Values) {
+                        foreach (var pValue in attr.Values)
+                        {
                             var pAttrValue = Convert.ToDecimal(pValue);
                             //检查是否满足Excld的情况
                             if (!string.IsNullOrEmpty(excld) && excld != "NULL")
@@ -901,7 +901,7 @@ namespace BOM.Models
             StringBuilder returnString = new StringBuilder();
             if (cAttrType == "C")//字符型
             {
-               var elements = Expression.Split('+');
+                var elements = Expression.Split('+');
                 foreach (var element in elements)
                 {
                     if (element[0] == '@')//取父属性值
@@ -920,8 +920,9 @@ namespace BOM.Models
             else//数值型
             {
                 returnString.Append(Expression);
-                var elements = Expression.Split('+','-','*','/');
-                foreach (var element in elements) {
+                var elements = Expression.Split('+', '-', '*', '/');
+                foreach (var element in elements)
+                {
                     if (element[0] == '@')
                     {
                         returnString.Replace(element, pNode.Attributes.Find(m => m.Id == element.Substring(1)).Values[0]);
@@ -932,9 +933,208 @@ namespace BOM.Models
                 return command.ExecuteScalar().ToString();
             }
         }
-        public void Save(List<NodeInfo> nodes)
+        public void SaveBOMTree(List<NodeInfo> nodes)
         {
 
+        }
+
+        public bool SaveNode(NodeInfo node)
+        {
+            int result = -1;
+            bool hasPrivateAttribute = false;
+            string materielIdentification = null;
+            string sql = null;
+            StringBuilder insertBuilder = new StringBuilder($"INSERT INTO {node.TmpId} (");
+            StringBuilder insertValues = new StringBuilder($" ) VALUES (");
+
+            SqlDataReader dataReader = null;
+
+            //如果节点没有物料编码则生成
+            if (string.IsNullOrEmpty(node.MaterielId))
+            {
+                //If nodeInfo has private attribute
+                hasPrivateAttribute = node.Attributes.Where(m => m.Flag == "1").Count() > 0;
+                if (hasPrivateAttribute)
+                {
+                    //Check if the private attribute table exists
+                    sql = $"SELECT COUNT(*) FROM SYSOBJECTS WHERE NAME = '{node.TmpId}' ";
+                    command.CommandText = sql;
+                    try
+                    {
+                        result = (int)command.ExecuteScalar();
+                    }
+                    catch (Exception e)
+                    {
+                        log.Error(string.Format($"Look for talbe {node.TmpId} Error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                        throw;
+                    }
+                    if (result == 0)
+                    {
+                        log.Error(string.Format($"Table {node.TmpId} doesn't exsit!\nsql[{sql}]\n"));
+                        throw new Exception($"Table {node.TmpId} doesn't exsit!!");
+                    }
+
+                    //Check duplicated records
+                    StringBuilder builder = new StringBuilder($"SELECT COUNT(*) FROM {node.TmpId} WHERE");
+
+                    int counter = 0;
+                    var privateAttributes = node.Attributes.Where(m => m.Flag == "1");
+                    foreach (var attrbute in privateAttributes)
+                    {
+                        counter++;
+                        if (attrbute.Type == "C")
+                        {
+                            builder.Append($" {attrbute.Id} = '{attrbute.Values[0]}'");
+                            insertBuilder.Append($" {attrbute.Id},");
+                            insertValues.Append($" '{attrbute.Values[0]}',");
+                        }
+                        else
+                        {
+                            builder.Append($" {attrbute.Id} = {attrbute.Values[0]}");
+                            insertBuilder.Append($" {attrbute.Id},");
+                            insertValues.Append($" {attrbute.Values[0]},");
+                        }
+
+                        if (counter != privateAttributes.Count())
+                        {
+                            builder.Append($" AND");
+                        }
+                    }
+                    sql = builder.ToString();
+
+                    command.CommandText = sql;
+                    try
+                    {
+                        result = (int)command.ExecuteScalar();
+                    }
+                    catch (Exception e)
+                    {
+                        log.Error(string.Format($"Select private attribute Error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                        throw;
+                    }
+                    if (result > 0)
+                    {
+                        log.Error(string.Format($"The private attrbutes have already exsited!\nsql[{sql}]\n"));
+                        throw new Exception("The private attrbutes have already exsited!!");
+                    }
+                }
+
+                //Get Materiel Identification
+
+                sql = $"SELECT NEXT_NO FROM SEQ_NO WHERE Ind_Key = '{node.TmpId}'";
+
+                try
+                {
+                    command.CommandText = sql;
+                    dataReader = command.ExecuteReader();
+
+                    if (dataReader.HasRows)
+                    {
+                        dataReader.Read();
+
+                        var tmp = dataReader[0];
+
+
+                        long nextNo = Convert.ToInt64(dataReader[0].ToString());
+
+                        dataReader.Close();
+
+                        materielIdentification = $"{node.TmpId}" + Convert.ToString(nextNo, 8);
+                        nextNo += 1;
+                        sql = $"UPDATE SEQ_NO SET NEXT_NO = {nextNo} WHERE IND_KEY = '{node.TmpId}'";
+                    }
+                    else
+                    {
+                        log.Error(string.Format($"Can't find record in table SEQ_NO.[{sql}]"));
+                        throw new Exception(string.Format($"Can't find record in table SEQ_NO.[{sql}]"));
+                    }
+
+                    command.CommandText = sql;
+                    result = command.ExecuteNonQuery();
+                    if (result == 0)
+                    {
+                        log.Error($"No record is updated,TmpID=[{node.TmpId}]");
+
+                        throw new Exception($"No record is updated,TmpID=[{node.TmpId}]");
+                    }
+                }
+                catch (Exception e)
+                {
+                    log.Error($"Get MaterielIdentification Error,TmpID=[{node.TmpId}]sql=[{sql}]error[{e.StackTrace}][{e}][{e.Message}]");
+                    dataReader.Close();
+
+                    throw;
+                }
+
+                //Register private attribute values
+                if (hasPrivateAttribute)
+                {
+                    sql = insertBuilder.ToString() + $" materielIdentfication" + insertValues.ToString() + $" '{materielIdentification}')";
+
+                    command.CommandText = sql;
+                    try
+                    {
+                        result = command.ExecuteNonQuery();
+                    }
+                    catch (Exception e)
+                    {
+                        log.Error(string.Format($"Register private attribute Error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+
+                        throw;
+                    }
+                    if (result == 0)
+                    {
+                        log.Error(string.Format($"No private attrbutes is registered!\nsql[{sql}]\n"));
+
+                        throw new Exception("No private attrbutes is registered!");
+                    }
+                }
+
+                //Register default attribute values
+                //前台必须给所有的缺省属性赋值,没有值赋缺省值
+                insertBuilder = new StringBuilder($"INSERT INTO DeafaultAttr (");
+                insertValues = new StringBuilder($" ) VALUES (");
+                var defaultAttributes = node.Attributes.Where(m => m.Flag == "0");
+                foreach (var defaultAttrbute in defaultAttributes)
+                {
+                    insertBuilder.Append($" {defaultAttrbute.Id},");
+                    if (defaultAttrbute.Type == "C")
+                    {
+                        insertValues.Append($" '{defaultAttrbute.Values[0]}',");
+                    }
+                    else
+                    {
+                        insertValues.Append($" {defaultAttrbute.Values[0]},");
+                    }
+                }
+                sql = insertBuilder.ToString() + $" materielIdentfication" + insertValues.ToString() + $" '{materielIdentification}')";
+
+                command.CommandText = sql;
+                try
+                {
+                    result = command.ExecuteNonQuery();
+                }
+                catch (Exception e)
+                {
+                    log.Error(string.Format($"Register default attribute Error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                    throw;
+                }
+                if (result == 0)
+                {
+                    log.Error(string.Format($"No default attrbutes is registered!\nsql[{sql}]\n"));
+
+                    throw new Exception("No default attrbutes is registered!");
+                }
+            }
+
+
+            //生成DCM码
+
+
+
+
+
+            return true;
         }
 
     }

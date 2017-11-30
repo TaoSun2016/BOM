@@ -98,14 +98,14 @@ namespace BOM.Controllers
             SqlConnection sqlConnection = DBConnection.OpenConnection();
             SqlCommand command = new SqlCommand();
             SqlTransaction transaction = sqlConnection.BeginTransaction();
-            List<NodeInfo> list = new List<NodeInfo>;
+            List<NodeInfo> list = new List<NodeInfo>();
 
             BOMTree bomTree = new BOMTree(sqlConnection,command,transaction);
 
 
             try
             {
-                bomTree.CreateBOMTree(ref list, node, node.NodeLevel);
+                bomTree.CreateBOMTree(ref list, node);
                 return list;
             }
             catch (Exception e)

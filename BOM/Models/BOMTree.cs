@@ -379,7 +379,7 @@ namespace BOM.Models
         }
 
 
-        public void CreateBOMTree(ref List<NodeInfo> list, NodeInfo node, int level)
+        public void CreateBOMTree(ref List<NodeInfo> list, NodeInfo node)
         {
             string sql = null;
             NodeInfo child = new NodeInfo();
@@ -420,7 +420,7 @@ namespace BOM.Models
                         if (reader.HasRows)
                         {
                             reader.Read();
-                            child.NodeLevel = level;
+                            child.NodeLevel = node.NodeLevel+1;
                             child.PTmpId = node.TmpId;
                             child.TmpId = cTmpId;
                             child.TmpNm = reader[0].ToString();
@@ -465,7 +465,7 @@ namespace BOM.Models
                     }
 
                     GetChildAttributeValues(node, child);
-                    CreateBOMTree(ref list, child, level + 1);
+                    CreateBOMTree(ref list, child);
                 }
 
             }

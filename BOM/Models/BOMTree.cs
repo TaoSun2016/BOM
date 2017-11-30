@@ -1192,7 +1192,7 @@ namespace BOM.Models
             //获取数量
             var totalAmount = Convert.ToDecimal(node.Attributes.Find(m => m.Id == "_danyl").Values[0]) * count;
 
-            sql = $"INSERT INTO BOM VALUES ('{node.pMaterielId}','{node.PTmpId}','{node.materielId}','{node.TmpId}','{totalAmount}',{node.rlSeqNo},{node.pMaterielId})";
+            sql = $"INSERT INTO BOM VALUES ('{node.pMaterielId}','{node.PTmpId}','{node.MaterielId}','{node.TmpId}','{totalAmount}',{node.rlSeqNo},{node.pMaterielId})";
 
             try
             {
@@ -1217,12 +1217,10 @@ namespace BOM.Models
         public string pMaterielId { get; set; }
         public string TmpId { get; set; }
         public string TmpNm { get; set; }
-        public string materielId { get; set; }
-        public int rlSeqNo { get; set; }
-        public decimal Count { get; set; }
         public string MaterielId { get; set; }
+        public int rlSeqNo { get; set; }
+        public decimal Count { get; set; }       
         public List<TempletAttribute> Attributes { get; set; }
-
         public NodeInfo()
         {
             Attributes = new List<TempletAttribute>();

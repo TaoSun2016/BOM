@@ -381,11 +381,14 @@ namespace BOM.Models
 
         public void CreateBOMTree(ref List<NodeInfo> list, NodeInfo node)
         {
+            bool uniqFlag = false;
             string sql = null;
-            NodeInfo child = new NodeInfo();
+            StringBuilder stringBuilder = new StringBuilder();
+
+            NodeInfo child = null;
             List<string> listCtmpId = new List<string>();
             List<int> listSeqNo = new List<int>();
-
+            LogNode(node);
 
             list.Add(node);
 
@@ -404,11 +407,11 @@ namespace BOM.Models
                 }
                 reader.Close();
 
-
                 for (int i = 0; i < listCtmpId.Count; i++)
                 {
                     string cTmpId = listCtmpId[i];
                     int cSeqNo = listSeqNo[i];
+                    child = new NodeInfo();
 
                     //查询子节点模板信息,部分子节点属性赋值
                     sql = $"SELECT TmpNm FROM TmpInfo WHERE TmpId = '{cTmpId}'";
@@ -420,7 +423,7 @@ namespace BOM.Models
                         if (reader.HasRows)
                         {
                             reader.Read();
-                            child.NodeLevel = node.NodeLevel+1;
+                            child.NodeLevel = node.NodeLevel + 1;
                             child.PTmpId = node.TmpId;
                             child.TmpId = cTmpId;
                             child.TmpNm = reader[0].ToString();
@@ -430,6 +433,7 @@ namespace BOM.Models
                         else
                         {
                             log.Error(string.Format($"Select TmpInfo error!\nsql[{sql}]\nError"));
+                            reader.Close();
                             throw new Exception("No data found!");
                         }
                     }
@@ -440,9 +444,10 @@ namespace BOM.Models
                         throw;
                     }
 
+                    //获取子节点属性定义
                     //Flag :0 default attribute 1 private attribute
                     //sql = $"SELECT CASE TmpId WHEN 0 THEN 0 ELSE 1 END AS Flag, AttrId, AttrNm, AttrTp FROM AttrDefine WHERE TmpId = {tmpId} or TmpId = 0";
-                    sql = $"SELECT CASE TmpId WHEN '0' THEN '0' ELSE '1' END AS Flag, AttrId, AttrNm, AttrTp FROM AttrDefine WHERE TmpId = '{cTmpId}' or TmpId = '0' ORDER BY FLAG, AttrId";
+                    sql = $"SELECT CASE TmpId WHEN '0' THEN '0' ELSE '1' END AS Flag, AttrId, AttrNm, AttrTp FROM AttrDefine WHERE TmpId = '{cTmpId}' or TmpId = '0'  AND LockFlag = '1' ORDER BY FLAG, AttrId";
                     command.CommandText = sql;
 
                     try
@@ -453,21 +458,79 @@ namespace BOM.Models
 
                             child.Attributes.Add(new TempletAttribute { Flag = reader["Flag"].ToString(), Id = reader["AttrId"].ToString(), Name = reader["AttrNm"].ToString(), Type = reader["AttrTp"].ToString(), Values = new List<string>() });
                         }
+                        reader.Close();
                     }
                     catch (Exception e)
                     {
                         log.Error(string.Format($"Select AttrDefine error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                        reader.Close();
                         throw;
                     }
-                    finally
-                    {
-                        reader.Close();
-                    }
 
+                    //获取子节点属性值
                     GetChildAttributeValues(node, child);
+
+                    /*
+                     //判断属性取值是否唯一
+                     uniqFlag = true;
+                     foreach (var attribute in child.Attributes)
+                     {
+                         if (attribute.Values.Count > 1)
+                         {
+                             uniqFlag = false;
+                             break;
+                         }
+                     }
+
+                     //属性取值唯一则尝试根据属性取值获取物料编码
+                     if (uniqFlag)
+                     {
+                         List<string> materielIdList = new List<string>();
+                         stringBuilder.Clear();
+                         stringBuilder.Append($"SELECT ISNULL(materielIdentfication,'NULL')  AS ID FROM {child.TmpId} WHERE");
+                         foreach (var attribute in child.Attributes.Where(m => m.Flag == "1"))
+                         {
+                             var value = (attribute.Type == "C") ? ("'" + attribute.Values[0].Trim() + "'") :attribute.Values[0].Trim() ;
+                             stringBuilder.Append($" {attribute.Id} = {value}");
+                         }
+                         command.CommandText = stringBuilder.ToString();
+                         try
+                         {
+                             reader = command.ExecuteReader();
+                             while (reader.Read())
+                             {
+
+                                 materielIdList.Add(reader["ID"].ToString());
+                             }
+                             reader.Close();
+                             if (materielIdList.Count == 1)
+                             {
+                                 child.MaterielId = materielIdList[0];
+                             }
+                             else if(materielIdList.Count > 1)
+                             {
+                                 child.MaterielId = "MultipleMateriels";
+                                 list.Add(child);
+                                 continue;
+                             }
+                         }
+                         catch (Exception e)
+                         {
+                             log.Error(string.Format($"Select AttrDefine error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                             reader.Close();
+                             throw;
+                         }
+
+                     }
+                     else{
+                         //属性取值不唯一则登记节点并停止该节点以后的遍历
+                         list.Add(child);
+                         continue;
+                     }
+                     */
+
                     CreateBOMTree(ref list, child);
                 }
-
             }
             else
             {
@@ -480,7 +543,6 @@ namespace BOM.Models
         public void GetChildAttributeValues(NodeInfo pNode, NodeInfo cNode)
         {
             int valueTpCount = 0;
-
             string origValueType = "";
 
             string cAttrId = "";
@@ -495,9 +557,9 @@ namespace BOM.Models
             string gteq = "";
             string lteq = "";
 
+            List<AttrPass> relationList = new List<AttrPass>();
             List<string> values = new List<string>();
             List<string> midValues = new List<string>();
-
 
             string sql = "";
             string defaultValue = "";
@@ -509,219 +571,171 @@ namespace BOM.Models
             foreach (var attribute in cNode.Attributes)
             {
 
-                sql = $"SELECT CAttrID,CAttrValue,ValueType,PAttrId,Gt,Lt,Eq,Excld,Gteq,Lteq FROM AttrPass WHERE TmpId = '{pNode.TmpId}' and CTmpId = '{cNode.TmpId}' AND rlSeqNo = '{cNode.rlSeqNo} AND CAttrId = '{attribute.Id}' ORDER BY ValueType";
+                sql = $"SELECT CAttrID,CAttrValue,ValueTp,PAttrId,Gt,Lt,Eq,Excld,Gteq,Lteq FROM AttrPass WHERE TmpId = '{pNode.TmpId}' and CTmpId = '{cNode.TmpId}' AND rlSeqNo = {cNode.rlSeqNo} AND CAttrId = '{attribute.Id}' ORDER BY ValueTp";
                 command.CommandText = sql;
 
+                relationList.Clear();
                 SqlDataReader reader = command.ExecuteReader();
-                while (reader.Read())
+
+                if (reader.HasRows)
                 {
-                    cAttrId = reader["CAttrId"].ToString();
-                    CAttrType = attribute.Type;
-                    cAttrValue = reader["CAttrValue"].ToString();
-                    valueType = reader["ValueType"].ToString();
-                    pAttrId = reader["PAttrId"].ToString();
-                    gt = reader["Gt"].ToString();
-                    lt = reader["Lt"].ToString();
-                    eq = reader["Eq"].ToString();
-                    excld = reader["Excld"].ToString();
-                    gteq = reader["Gteq"].ToString();
-                    lteq = reader["Lteq"].ToString();
-
-                    //ValueTp变更时即切换规则时,判断上一规则有无计算出值,有则保存到列表再继续下移valueType
-                    if (valueType != origValueType && valueTpCount != 0)
+                    while (reader.Read())
                     {
-                        if (verified)
+                        relationList.Add(new AttrPass
                         {
-                            values.Union(midValues);
-                        }
-                        //初始化属性取值
-                        verified = true;
-                        midValues.Clear();
-                        origValueType = valueType;
+                            CAttrId = reader["CAttrId"].ToString().Trim(),
+                            CAttrType = attribute.Type.Trim(),
+                            CAttrValue = reader["CAttrValue"].ToString().Trim(),
+                            ValueTp = reader["ValueTp"].ToString().Trim(),
+                            PAttrId = reader["PAttrId"].ToString().Trim(),
+                            Gt = reader["Gt"].ToString().Trim(),
+                            Lt = reader["Lt"].ToString().Trim(),
+                            Eq = reader["Eq"].ToString().Trim(),
+                            Excld = reader["Excld"].ToString().Trim(),
+                            Gteq = reader["Gteq"].ToString().Trim(),
+                            Lteq = reader["Lteq"].ToString().Trim()
+                        });
+
                     }
+                    reader.Close();
 
-                    //属性的缺省值,在此循环中只保留值,不作处理
-                    if (valueType == "0")
+                    foreach (var attrPass in relationList)
                     {
-                        defaultValue = CalculateAttrbuteValue(pNode, CAttrType, cAttrValue);
-                        continue;
-                    }
+                        cAttrId = attrPass.CAttrId;
+                        CAttrType = attrPass.CAttrType;
+                        cAttrValue = attrPass.CAttrValue;
+                        valueType = attrPass.ValueTp;
+                        pAttrId = attrPass.PAttrId;
+                        gt = attrPass.Gt;
+                        lt = attrPass.Lt;
+                        eq = attrPass.Eq;
+                        excld = attrPass.Excld;
+                        gteq = attrPass.Gteq;
+                        lteq = attrPass.Lteq;
 
-                    valueTpCount++;
-
-                    //如果同组valuetype中有验证不过的,则该组valuetype后续记录都跳过
-                    if (!verified)
-                    {
-                        continue;
-                    }
-
-                    //获取父属性信息
-                    var attr = pNode.Attributes.Find(m => m.Id == pAttrId);
-
-                    //父属性是字符型,字符型只判断相等和不等
-                    if (attr.Type == "C")
-                    {
-                        foundNum = 0;
-                        foreach (var pValue in attr.Values)
+                        //ValueTp变更时即切换规则时,判断上一规则有无计算出值,有则保存到列表再继续下移valueType
+                        if (valueType != origValueType && valueTpCount != 0)
                         {
-                            //检查是否满足Excld的情况
-                            if (!string.IsNullOrEmpty(excld) && excld != "NULL")
+                            if (verified)
                             {
-                                found = false;
-
-                                var valueArray = excld.Split(',');
-                                foreach (var element in valueArray)
-                                {
-                                    if (pValue == element)
-                                    {
-                                        found = true;
-                                        break;
-                                    }
-                                }
-                                if (found)
-                                {
-                                    continue;
-                                }
+                                values.Union(midValues);
                             }
-
-                            //判断是否满足相等的情况
-                            if (!string.IsNullOrEmpty(eq) && eq != "NULL")
-                            {
-                                found = false;  //true表示找到相等的值
-
-                                var valueArray = eq.Split(',');
-                                foreach (var element in valueArray)
-                                {
-                                    if (pValue == element)
-                                    {
-                                        found = true;
-                                        break;
-                                    }
-                                }
-                                if (found)
-                                {
-
-                                    midValues.Add(CalculateAttrbuteValue(pNode, CAttrType, cAttrValue));
-                                    foundNum++;
-                                    continue;
-                                }
-                            }
+                            //初始化属性取值
+                            verified = true;
+                            midValues.Clear();
+                            origValueType = valueType;
                         }
-                        if (foundNum == 0)
+
+                        //属性的缺省值,在此循环中只保留值,不作处理
+                        if (valueType == "0")
                         {
-                            verified = false;
+                            defaultValue = CalculateAttrbuteValue(pNode, CAttrType, cAttrValue);
                             continue;
                         }
 
+                        valueTpCount++;
 
-
-
-                    }
-                    else//父属性是数字型,数字型需要判断相等,不等和大于小于
-                    {
-                        foundNum = 0;
-                        foreach (var pValue in attr.Values)
+                        //如果同组valuetype中有验证不过的,则该组valuetype后续记录都跳过
+                        if (!verified)
                         {
-                            var pAttrValue = Convert.ToDecimal(pValue);
-                            //检查是否满足Excld的情况
-                            if (!string.IsNullOrEmpty(excld) && excld != "NULL")
+                            continue;
+                        }
+
+                        //获取父属性信息
+                        var attr = pNode.Attributes.Find(m => m.Id == pAttrId);
+
+                        //父属性是字符型,字符型只判断相等和不等
+                        if (attr.Type == "C")
+                        {
+                            foundNum = 0;
+                            foreach (var pValue in attr.Values)
                             {
-                                found = false;
-
-                                var valueArray = excld.Split(',');
-                                foreach (var element in valueArray)
+                                //检查是否满足Excld的情况
+                                if (!string.IsNullOrEmpty(excld) && excld != "NULL")
                                 {
+                                    found = false;
 
-                                    if (Math.Abs(pAttrValue - Convert.ToDecimal(element)) < 0.005m)
+                                    var valueArray = excld.Split(',');
+                                    foreach (var element in valueArray)
                                     {
-                                        found = true; ;
-                                        break;
+                                        if (pValue == element.Trim())
+                                        {
+                                            found = true;
+                                            break;
+                                        }
+                                    }
+                                    if (found)
+                                    {
+                                        continue;
                                     }
                                 }
-                                if (found)
+
+                                //判断是否满足相等的情况
+                                if (!string.IsNullOrEmpty(eq) && eq != "NULL")
                                 {
-                                    continue;
+                                    found = false;  //true表示找到相等的值
+
+                                    var valueArray = eq.Split(',');
+                                    foreach (var element in valueArray)
+                                    {
+                                        if (pValue == element)
+                                        {
+                                            found = true;
+                                            break;
+                                        }
+                                    }
+                                    if (found)
+                                    {
+                                        midValues.Add(CalculateAttrbuteValue(pNode, CAttrType, cAttrValue));
+                                        foundNum++;
+                                        continue;
+                                    }
                                 }
                             }
-
-                            //检查是否满足相等情况,满足即可进入下一轮循环,不满足在判断大于和小于的情况
-                            if (!string.IsNullOrEmpty(eq) && eq != "NULL")
+                            if (foundNum == 0)
                             {
-                                found = false;
-                                var valueArray = eq.Split(',');
-                                foreach (var element in valueArray)
-                                {
-                                    if (Math.Abs(pAttrValue - Convert.ToDecimal(element)) < 0.005m)
-                                    {
-                                        found = true;
-                                        break;
-                                    }
-                                }
-
-                                if (found)
-                                {
-                                    midValues.Add(CalculateAttrbuteValue(pNode, CAttrType, cAttrValue));
-                                    foundNum++;
-                                    continue;
-                                }
+                                verified = false;
+                                continue;
                             }
-
-                            //判断大于,小于的情况
-
-                            //gt,lt都有值
-                            if (!string.IsNullOrEmpty(gt) && gt != "NULL" && !string.IsNullOrEmpty(lt) && lt != "NULL")
+                        }
+                        else//父属性是数字型,数字型需要判断相等,不等和大于小于
+                        {
+                            foundNum = 0;
+                            foreach (var pValue in attr.Values)
                             {
-                                var gtValue = Convert.ToDecimal(gt);
-                                var ltValue = Convert.ToDecimal(lt);
-
-                                found = true;
-
-                                if (ltValue > gtValue)//此时应判断父属性值大于gtValue并且小于ltValue
+                                var pAttrValue = Convert.ToDecimal(pValue);
+                                //检查是否满足Excld的情况
+                                if (!string.IsNullOrEmpty(excld) && excld != "NULL")
                                 {
-                                    //gteq == "1' 表示使用>=判断gt的值,否则使用>判断gt的值. lteq同样处理
-                                    if (gteq == "1") //pAttrValue >= gtValue
-                                    {
-                                        if (pAttrValue - gtValue > -0.005m)
-                                        {
-                                            //found = true;
-                                        }
-                                        else
-                                        {
-                                            found = false;
-                                        }
-                                    }
-                                    else  //pAttrValue > gtValue
-                                    {
-                                        if (pAttrValue - gtValue > 0)
-                                        {
-                                            //found = true;
-                                        }
-                                        else
-                                        {
-                                            found = false;
-                                        }
-                                    }
+                                    found = false;
 
-                                    if (lteq == "1") //pAttrValue <= ltValue
+                                    var valueArray = excld.Split(',');
+                                    foreach (var element in valueArray)
                                     {
-                                        if (pAttrValue - gtValue < 0.005m)
+
+                                        if (Math.Abs(pAttrValue - Convert.ToDecimal(element)) < 0.005m)
                                         {
-                                            //found = true;
-                                        }
-                                        else
-                                        {
-                                            found = false;
+                                            found = true; ;
+                                            break;
                                         }
                                     }
-                                    else  //pAttrValue < ltValue
+                                    if (found)
                                     {
-                                        if (pAttrValue - gtValue < 0)
+                                        continue;
+                                    }
+                                }
+
+                                //检查是否满足相等情况,满足即可进入下一轮循环,不满足在判断大于和小于的情况
+                                if (!string.IsNullOrEmpty(eq) && eq != "NULL")
+                                {
+                                    found = false;
+                                    var valueArray = eq.Split(',');
+                                    foreach (var element in valueArray)
+                                    {
+                                        if (Math.Abs(pAttrValue - Convert.ToDecimal(element)) < 0.005m)
                                         {
-                                            //found = true;
-                                        }
-                                        else
-                                        {
-                                            found = false;
+                                            found = true;
+                                            break;
                                         }
                                     }
 
@@ -732,186 +746,272 @@ namespace BOM.Models
                                         continue;
                                     }
                                 }
-                                else//此时应判断父属性值大于gtValue或者小于ltValue
-                                {
-                                    if (gteq == "1") //pAttrValue >= gtValue
-                                    {
-                                        if (pAttrValue - gtValue > -0.005m)
-                                        {
-                                            //found = true;
-                                        }
-                                        else
-                                        {
-                                            found = false;
-                                        }
-                                    }
-                                    else  //pAttrValue > gtValue
-                                    {
-                                        if (pAttrValue - gtValue > 0)
-                                        {
-                                            //found = true;
-                                        }
-                                        else
-                                        {
-                                            found = false;
-                                        }
-                                    }
-                                    if (found)
-                                    {
-                                        midValues.Add(CalculateAttrbuteValue(pNode, CAttrType, cAttrValue));
-                                        foundNum++;
-                                        continue;
-                                    }
 
-                                    if (lteq == "1") //pAttrValue <= ltValue
-                                    {
-                                        if (pAttrValue - gtValue < 0.005m)
-                                        {
-                                            //found = true;
-                                        }
-                                        else
-                                        {
-                                            found = false;
-                                        }
-                                    }
-                                    else  //pAttrValue < ltValue
-                                    {
-                                        if (pAttrValue - gtValue < 0)
-                                        {
-                                            //found = true;
-                                        }
-                                        else
-                                        {
-                                            found = false;
-                                        }
-                                    }
+                                //判断大于,小于的情况
 
-                                    if (found)
-                                    {
-                                        midValues.Add(CalculateAttrbuteValue(pNode, CAttrType, cAttrValue));
-                                        foundNum++;
-                                        continue;
-                                    }
-                                }
-                            }
-                            else//gt,lt都没有值或只有一个有值
-                            {
-
-                                found = false;
-                                if (!string.IsNullOrEmpty(gt) && gt != "NULL")
+                                //gt,lt都有值
+                                if (!string.IsNullOrEmpty(gt) && gt != "NULL" && !string.IsNullOrEmpty(lt) && lt != "NULL")
                                 {
                                     var gtValue = Convert.ToDecimal(gt);
-
-                                    if (gteq == "1") //pAttrValue >= gtValue
-                                    {
-                                        if (pAttrValue - gtValue > -0.005m)
-                                        {
-                                            found = true;
-                                        }
-                                        else
-                                        {
-                                            //found = false;
-                                        }
-                                    }
-                                    else  //pAttrValue > gtValue
-                                    {
-                                        if (pAttrValue - gtValue > 0)
-                                        {
-                                            found = true;
-                                        }
-                                        else
-                                        {
-                                            //found = false;
-                                        }
-                                    }
-                                    if (found)
-                                    {
-                                        midValues.Add(CalculateAttrbuteValue(pNode, CAttrType, cAttrValue));
-                                        foundNum++;
-                                        continue;
-                                    }
-
-                                }
-                                else if (!string.IsNullOrEmpty(lt) && lt != "NULL")
-                                {
                                     var ltValue = Convert.ToDecimal(lt);
 
-                                    if (lteq == "1") //pAttrValue <= ltValue
+                                    found = true;
+
+                                    if (ltValue > gtValue)//此时应判断父属性值大于gtValue并且小于ltValue
                                     {
-                                        if (pAttrValue - ltValue < 0.005m)
+                                        //gteq == "1' 表示使用>=判断gt的值,否则使用>判断gt的值. lteq同样处理
+                                        if (gteq == "1") //pAttrValue >= gtValue
                                         {
-                                            found = true;
+                                            if (pAttrValue - gtValue > -0.005m)
+                                            {
+                                                //found = true;
+                                            }
+                                            else
+                                            {
+                                                found = false;
+                                            }
                                         }
-                                        else
+                                        else  //pAttrValue > gtValue
                                         {
-                                            //found = false;
+                                            if (pAttrValue - gtValue > 0)
+                                            {
+                                                //found = true;
+                                            }
+                                            else
+                                            {
+                                                found = false;
+                                            }
+                                        }
+
+                                        if (lteq == "1") //pAttrValue <= ltValue
+                                        {
+                                            if (pAttrValue - gtValue < 0.005m)
+                                            {
+                                                //found = true;
+                                            }
+                                            else
+                                            {
+                                                found = false;
+                                            }
+                                        }
+                                        else  //pAttrValue < ltValue
+                                        {
+                                            if (pAttrValue - gtValue < 0)
+                                            {
+                                                //found = true;
+                                            }
+                                            else
+                                            {
+                                                found = false;
+                                            }
+                                        }
+
+                                        if (found)
+                                        {
+                                            midValues.Add(CalculateAttrbuteValue(pNode, CAttrType, cAttrValue));
+                                            foundNum++;
+                                            continue;
                                         }
                                     }
-                                    else  //pAttrValue < ltValue
+                                    else//此时应判断父属性值大于gtValue或者小于ltValue
                                     {
-                                        if (pAttrValue - ltValue < 0)
+                                        if (gteq == "1") //pAttrValue >= gtValue
                                         {
-                                            found = true;
+                                            if (pAttrValue - gtValue > -0.005m)
+                                            {
+                                                //found = true;
+                                            }
+                                            else
+                                            {
+                                                found = false;
+                                            }
                                         }
-                                        else
+                                        else  //pAttrValue > gtValue
                                         {
-                                            //found = false;
+                                            if (pAttrValue - gtValue > 0)
+                                            {
+                                                //found = true;
+                                            }
+                                            else
+                                            {
+                                                found = false;
+                                            }
+                                        }
+                                        if (found)
+                                        {
+                                            midValues.Add(CalculateAttrbuteValue(pNode, CAttrType, cAttrValue));
+                                            foundNum++;
+                                            continue;
+                                        }
+
+                                        if (lteq == "1") //pAttrValue <= ltValue
+                                        {
+                                            if (pAttrValue - gtValue < 0.005m)
+                                            {
+                                                //found = true;
+                                            }
+                                            else
+                                            {
+                                                found = false;
+                                            }
+                                        }
+                                        else  //pAttrValue < ltValue
+                                        {
+                                            if (pAttrValue - gtValue < 0)
+                                            {
+                                                //found = true;
+                                            }
+                                            else
+                                            {
+                                                found = false;
+                                            }
+                                        }
+
+                                        if (found)
+                                        {
+                                            midValues.Add(CalculateAttrbuteValue(pNode, CAttrType, cAttrValue));
+                                            foundNum++;
+                                            continue;
                                         }
                                     }
-                                    if (found)
+                                }
+                                else//gt,lt都没有值或只有一个有值
+                                {
+
+                                    found = false;
+                                    if (!string.IsNullOrEmpty(gt) && gt != "NULL")
                                     {
-                                        midValues.Add(CalculateAttrbuteValue(pNode, CAttrType, cAttrValue));
-                                        foundNum++;
-                                        continue;
+                                        var gtValue = Convert.ToDecimal(gt);
+
+                                        if (gteq == "1") //pAttrValue >= gtValue
+                                        {
+                                            if (pAttrValue - gtValue > -0.005m)
+                                            {
+                                                found = true;
+                                            }
+                                            else
+                                            {
+                                                //found = false;
+                                            }
+                                        }
+                                        else  //pAttrValue > gtValue
+                                        {
+                                            if (pAttrValue - gtValue > 0)
+                                            {
+                                                found = true;
+                                            }
+                                            else
+                                            {
+                                                //found = false;
+                                            }
+                                        }
+                                        if (found)
+                                        {
+                                            midValues.Add(CalculateAttrbuteValue(pNode, CAttrType, cAttrValue));
+                                            foundNum++;
+                                            continue;
+                                        }
+
+                                    }
+                                    else if (!string.IsNullOrEmpty(lt) && lt != "NULL")
+                                    {
+                                        var ltValue = Convert.ToDecimal(lt);
+
+                                        if (lteq == "1") //pAttrValue <= ltValue
+                                        {
+                                            if (pAttrValue - ltValue < 0.005m)
+                                            {
+                                                found = true;
+                                            }
+                                            else
+                                            {
+                                                //found = false;
+                                            }
+                                        }
+                                        else  //pAttrValue < ltValue
+                                        {
+                                            if (pAttrValue - ltValue < 0)
+                                            {
+                                                found = true;
+                                            }
+                                            else
+                                            {
+                                                //found = false;
+                                            }
+                                        }
+                                        if (found)
+                                        {
+                                            midValues.Add(CalculateAttrbuteValue(pNode, CAttrType, cAttrValue));
+                                            foundNum++;
+                                            continue;
+                                        }
                                     }
                                 }
                             }
-                        }
-                        if (foundNum == 0)
-                        {
-                            verified = false;
-                            continue;
-                        }
+                            if (foundNum == 0)
+                            {
+                                verified = false;
+                                continue;
+                            }
 
+                        }
                     }
 
-                }
+                    if (verified && valueTpCount > 0)
+                    {
+                        values.Union(midValues);
+                    }
 
-                if (verified && valueTpCount > 0)
-                {
-                    values.Union(midValues);
+                    //如果根据父节点属性无法计算子节点属性值,并且子节点属性有缺省值,则赋缺省值
+                    if (values.Count == 0 && !string.IsNullOrEmpty(defaultValue))
+                    {
+                        values.Add(defaultValue);
+                    }
+                    if (values.Count > 0)
+                    {
+                        attribute.Values = values;
+                    }
                 }
-
-                //如果根据父节点属性无法计算子节点属性值,并且子节点属性有缺省值,则赋缺省值
-                if (values.Count == 0 && !string.IsNullOrEmpty(defaultValue))
-                {
-                    values.Add(defaultValue);
-                }
-                if (values.Count > 0)
-                {
-                    attribute.Values = values;
+                else {
+                    reader.Close();
                 }
             }
         }
 
+        //计算属性值
         public string CalculateAttrbuteValue(NodeInfo pNode, string cAttrType, string Expression)
         {
+            LogNode(pNode);
+            log.Info(Expression);
 
             StringBuilder returnString = new StringBuilder();
             if (cAttrType == "C")//字符型
             {
+
+
                 var elements = Expression.Split('+');
                 foreach (var element in elements)
                 {
                     if (element[0] == '@')//取父属性值
                     {
-                        //如果父属性有多个取值,子属性也支取一个,否则取值就没法算了
-                        returnString.Append(pNode.Attributes.Find(m => m.Id == element.Substring(1)).Values[0]);
+                        var attrValue = pNode.Attributes.Find(m => m.Id.Trim() == element.Substring(1));
+                        if (attrValue.Values.Count > 0)
+                        {
+                            var result = attrValue.Values[0];
+                            returnString.Append(result);
+                        }
+                        else
+                        {
+                            returnString.Append("");
+                        }
+                        
+
+                        //如果父属性有多个取值,子属性也只取一个,否则取值就没法算了
+                        
                     }
                     else
                     {
                         returnString.Append(element);
-
                     }
                 }
                 return returnString.ToString();
@@ -922,16 +1022,29 @@ namespace BOM.Models
                 var elements = Expression.Split('+', '-', '*', '/');
                 foreach (var element in elements)
                 {
+
                     if (element[0] == '@')
                     {
                         returnString.Replace(element, pNode.Attributes.Find(m => m.Id == element.Substring(1)).Values[0]);
-                    }
 
+                        var attrValue = pNode.Attributes.Find(m => m.Id.Trim() == element.Substring(1));
+                        if (attrValue.Values.Count > 0 && !string.IsNullOrEmpty(attrValue.Values[0]))
+                        {
+                            returnString.Replace(element, attrValue.Values[0]);
+                        }
+                        else
+                        {
+                            return "";
+                        }
+                    }
                 }
                 command.CommandText = $"SELECT {returnString} AS RESULT";
-                return command.ExecuteScalar().ToString();
+                var result = command.ExecuteScalar().ToString();
+                return result;
             }
         }
+
+        //保存BOM树
         public void SaveBOMTree(List<NodeInfo> nodes, NodeInfo node, decimal count)
         {
             List<NodeInfo> childList = new List<NodeInfo>();
@@ -951,6 +1064,7 @@ namespace BOM.Models
             }
         }
 
+        //保存节点
         public bool SaveNode(NodeInfo node, decimal count)
         {
             int result = -1;
@@ -1014,7 +1128,6 @@ namespace BOM.Models
                         }
                     }
                     sql = builder.ToString();
-
                     command.CommandText = sql;
                     try
                     {
@@ -1033,9 +1146,7 @@ namespace BOM.Models
                 }
 
                 //Get Materiel Identification
-
                 sql = $"SELECT NEXT_NO FROM SEQ_NO WHERE Ind_Key = '{node.TmpId}'";
-
                 try
                 {
                     command.CommandText = sql;
@@ -1044,12 +1155,8 @@ namespace BOM.Models
                     if (dataReader.HasRows)
                     {
                         dataReader.Read();
-
                         var tmp = dataReader[0];
-
-
                         long nextNo = Convert.ToInt64(dataReader[0].ToString());
-
                         dataReader.Close();
 
                         materielIdentification = $"{node.TmpId}" + Convert.ToString(nextNo, 8);
@@ -1141,12 +1248,9 @@ namespace BOM.Models
                 node.MaterielId = materielIdentification;
             }
 
-
-
             //生成DCM码
             int dcm = 0;
             sql = $"SELECT DCM FROM TmpInfo WHERE TmpId = '{node.TmpId}'";
-
             try
             {
                 command.CommandText = sql;
@@ -1171,8 +1275,6 @@ namespace BOM.Models
                             throw new Exception($"No record is updated in TmpInfo,TmpID=[{node.TmpId}]");
                         }
                     }
-
-
                 }
                 else
                 {
@@ -1187,9 +1289,7 @@ namespace BOM.Models
                 throw;
             }
 
-
-            //登记表BOM
-            //获取数量
+            //登记表BOM //获取数量
             var totalAmount = Convert.ToDecimal(node.Attributes.Find(m => m.Id == "_danyl").Values[0]) * count;
 
             sql = $"INSERT INTO BOM VALUES ('{node.pMaterielId}','{node.PTmpId}','{node.MaterielId}','{node.TmpId}','{totalAmount}',{node.rlSeqNo},{node.pMaterielId})";
@@ -1198,18 +1298,34 @@ namespace BOM.Models
             {
                 command.CommandText = sql;
                 result = command.ExecuteNonQuery();
-
             }
             catch (Exception e)
             {
                 log.Error($"Insert BOM Error,sql=[{sql}]error[{e.StackTrace}][{e}][{e.Message}]");
                 throw;
-
             }
             return true;
         }
 
+        private void LogNode(NodeInfo node)
+        {
+            log.Info("=====================");
+            log.Info("NodeLevel" + node.NodeLevel);
+            log.Info("TmpId" + node.TmpId);
+            log.Info("---------------------------");
+            foreach (var attr in node.Attributes)
+            {
+                log.Info(attr.Id + "----" + attr.Name+":");
+                foreach (var value in attr.Values)
+                {
+                    log.Info("=>"+value);
+                }
+            }
+            log.Info("=====================");
+        }
     }
+
+
     public class NodeInfo
     {
         public int NodeLevel { get; set; }
@@ -1219,7 +1335,7 @@ namespace BOM.Models
         public string TmpNm { get; set; }
         public string MaterielId { get; set; }
         public int rlSeqNo { get; set; }
-        public decimal Count { get; set; }       
+        public decimal Count { get; set; }
         public List<TempletAttribute> Attributes { get; set; }
         public NodeInfo()
         {
@@ -1240,6 +1356,22 @@ namespace BOM.Models
         {
             Values = new List<string>();
         }
+    }
+
+    public class AttrPass
+    {
+        public string CAttrId { get; set; }
+        public string CAttrType { get; set; }
+        public string CAttrValue { get; set; }
+        public string ValueTp { get; set; }
+        public string Eq { get; set; }
+        public string Excld { get; set; }
+        public string Gt { get; set; }
+        public string Gteq { get; set; }
+        public string Lt { get; set; }
+        public string Lteq { get; set; }
+        public string PAttrId { get; set; }
+
     }
 
 

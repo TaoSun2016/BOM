@@ -97,8 +97,11 @@ namespace BOM.Controllers
         {
             SqlConnection sqlConnection = DBConnection.OpenConnection();
             SqlCommand command = new SqlCommand();
+            
             SqlTransaction transaction = sqlConnection.BeginTransaction();
             List<NodeInfo> list = new List<NodeInfo>();
+            command.Connection = sqlConnection;
+            command.Transaction = transaction;
 
             BOMTree bomTree = new BOMTree(sqlConnection,command,transaction);
 
@@ -110,7 +113,7 @@ namespace BOM.Controllers
             }
             catch (Exception e)
             {
-                string logMessage = string.Format($"Create BOM Tree error!\n {e.StackTrace}");
+                string logMessage = string.Format($"Create BOM Tree error!\nErrorMsg[{e.Message}]\n {e.StackTrace}");
                 log.Error(logMessage);
                 var responseMessge = new HttpResponseMessage(HttpStatusCode.InternalServerError)
                 {

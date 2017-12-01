@@ -456,7 +456,7 @@ namespace BOM.Models
                         while (reader.Read())
                         {
 
-                            child.Attributes.Add(new TempletAttribute { Flag = reader["Flag"].ToString(), Id = reader["AttrId"].ToString(), Name = reader["AttrNm"].ToString(), Type = reader["AttrTp"].ToString(), Values = new List<string>() });
+                            child.Attributes.Add(new TempletAttribute { Flag = reader["Flag"].ToString().Trim(), Id = reader["AttrId"].ToString().Trim(), Name = reader["AttrNm"].ToString().Trim(), Type = reader["AttrTp"].ToString().Trim(), Values = new List<string>() });
                         }
                         reader.Close();
                     }
@@ -642,8 +642,7 @@ namespace BOM.Models
                         }
 
                         //获取父属性信息
-                        var attr = pNode.Attributes.Find(m => m.Id == pAttrId);
-
+                        var attr = pNode.Attributes.Find(m => m.Id.Trim() == pAttrId);
                         //父属性是字符型,字符型只判断相等和不等
                         if (attr.Type == "C")
                         {
@@ -981,9 +980,6 @@ namespace BOM.Models
         //计算属性值
         public string CalculateAttrbuteValue(NodeInfo pNode, string cAttrType, string Expression)
         {
-            LogNode(pNode);
-            log.Info(Expression);
-
             StringBuilder returnString = new StringBuilder();
             if (cAttrType == "C")//字符型
             {
@@ -1025,8 +1021,6 @@ namespace BOM.Models
 
                     if (element[0] == '@')
                     {
-                        returnString.Replace(element, pNode.Attributes.Find(m => m.Id == element.Substring(1)).Values[0]);
-
                         var attrValue = pNode.Attributes.Find(m => m.Id.Trim() == element.Substring(1));
                         if (attrValue.Values.Count > 0 && !string.IsNullOrEmpty(attrValue.Values[0]))
                         {

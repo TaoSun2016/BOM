@@ -470,7 +470,7 @@ namespace BOM.Models
                     //获取子节点属性值
                     GetChildAttributeValues(node, child);
 
-                    /*
+                    
                      //判断属性取值是否唯一
                      uniqFlag = true;
                      foreach (var attribute in child.Attributes)
@@ -527,7 +527,7 @@ namespace BOM.Models
                          list.Add(child);
                          continue;
                      }
-                     */
+                     
 
                     CreateBOMTree(ref list, child);
                 }

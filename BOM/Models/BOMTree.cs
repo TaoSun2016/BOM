@@ -77,7 +77,7 @@ namespace BOM.Models
 
                 //Flag :0 default attribute 1 private attribute
                 //sql = $"SELECT CASE TmpId WHEN 0 THEN 0 ELSE 1 END AS Flag, AttrId, AttrNm, AttrTp FROM AttrDefine WHERE TmpId = {tmpId} or TmpId = 0";
-                sql = $"SELECT CASE TmpId WHEN '0' THEN '0' ELSE '1' END AS Flag, AttrId, AttrNm, AttrTp FROM AttrDefine WHERE TmpId = '{tmpId}' or TmpId = '0' ORDER BY FLAG, AttrId";
+                sql = $"SELECT CASE TmpId WHEN '0' THEN '0' ELSE '1' END AS Flag, AttrId, AttrNm, AttrTp FROM AttrDefine WHERE TmpId = '{tmpId}' or TmpId = '0' AND LockFlag = '1' ORDER BY FLAG, AttrId";
                 command.CommandText = sql;
 
                 try
@@ -245,7 +245,7 @@ namespace BOM.Models
 
                         dataReader.Close();
 
-                        materielIdentification = $"{nodeInfo.TmpId}" + Convert.ToString(nextNo, 8);
+                        materielIdentification = $"{nodeInfo.TmpId}" +"9"+ Convert.ToString(nextNo, 8);
                         nextNo += 1;
                         sql = $"UPDATE SEQ_NO SET NEXT_NO = {nextNo} WHERE IND_KEY = '{nodeInfo.TmpId}'";
                     }
@@ -1053,7 +1053,7 @@ namespace BOM.Models
             {
                 foreach (var childnode in childList)
                 {
-                    SaveBOMTree(nodes, childnode, count);
+                    SaveBOMTree(nodes, childnode, childnode.Count);
                 }
             }
         }
@@ -1333,6 +1333,14 @@ namespace BOM.Models
         public List<TempletAttribute> Attributes { get; set; }
         public NodeInfo()
         {
+            NodeLevel = 0;
+            PTmpId = "";
+            pMaterielId = "";
+            TmpId = "";
+            TmpNm = "";
+            MaterielId = "";
+            rlSeqNo = 0;
+            Count = 0.00m;
             Attributes = new List<TempletAttribute>();
         }
     }

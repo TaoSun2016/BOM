@@ -40,8 +40,8 @@ namespace BOM.Models
 
             SqlDataReader dataReader = null;
 
-            log.Info("=================================================================");
-            log.Info($"tmpid = [{tmpId}] seqno=[{rlSeqNo}] level=[{level}]");
+            //log.Info("=================================================================");
+            //log.Info($"tmpid = [{tmpId}] seqno=[{rlSeqNo}] level=[{level}]");
             using (SqlCommand command = new SqlCommand())
             {
                 command.Connection = connection;
@@ -99,7 +99,7 @@ namespace BOM.Models
                 list.Add(nodeInfo);
 
                 //sql = $"SELECT CTmpId, rlSeqNo FROM Relation WHERE TmpId = {tmpId} ORDER BY CTmpId, rlSeqNo";
-                sql = $"SELECT CTmpId, rlSeqNo FROM Relation WHERE TmpId = '{tmpId}' ORDER BY CTmpId, rlSeqNo";
+                sql = $"SELECT CTmpId, rlSeqNo FROM Relation WHERE TmpId = '{tmpId}' AND LockFlag = '1' ORDER BY CTmpId, rlSeqNo";
                 command.CommandText = sql;
 
                 try
@@ -388,14 +388,80 @@ namespace BOM.Models
             NodeInfo child = null;
             List<string> listCtmpId = new List<string>();
             List<int> listSeqNo = new List<int>();
+
+            SqlDataReader reader = null;
             LogNode(node);
+
+            //如果有物料编码则直接登记节点信息,遍历其下子节点
+            if (string.IsNullOrEmpty(node.MaterielId.Trim()))
+            {
+                //判断属性取值是否唯一
+                uniqFlag = true;
+                foreach (var attribute in node.Attributes)
+                {
+                    if (attribute.Values.Count > 1)
+                    {
+                        uniqFlag = false;
+                        break;
+                    }
+                }
+
+                //属性取值唯一则尝试根据属性取值获取物料编码
+                if (uniqFlag)
+                {
+                    List<string> materielIdList = new List<string>();
+                    stringBuilder.Clear();
+                    stringBuilder.Append($"SELECT ISNULL(materielIdentfication,'NULL')  AS ID FROM {node.TmpId} WHERE");
+                    foreach (var attribute in node.Attributes.Where(m => m.Flag == "1"))
+                    {
+                        var value = (attribute.Type == "C") ? ("'" + attribute.Values[0].Trim() + "'") : attribute.Values[0].Trim();
+                        stringBuilder.Append($" {attribute.Id} = {value}");
+                    }
+                    command.CommandText = stringBuilder.ToString();
+                    try
+                    {
+                        reader = command.ExecuteReader();
+                        while (reader.Read())
+                        {
+
+                            materielIdList.Add(reader["ID"].ToString());
+                        }
+                        reader.Close();
+                        if (materielIdList.Count == 1)
+                        {
+                            node.MaterielId = materielIdList[0];
+                        }
+                        else if (materielIdList.Count > 1)
+                        {
+                            node.MaterielId = "MultipleMateriels";
+                            list.Add(node);
+                            return;
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        log.Error(string.Format($"Select AttrDefine error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                        reader.Close();
+                        throw;
+                    }
+
+                }
+                else
+                {
+                    //属性取值不唯一则登记节点并停止该节点以后的遍历
+                    list.Add(node);
+                    return;
+                }
+            }
+           
+            
 
             list.Add(node);
 
             sql = $"SELECT CTmpId, rlSeqNo　FROM RELATION WHERE TmpId = '{node.TmpId}' and LockFlag = 1 ORDER BY CTmpId, rlSeqNo";
             command.CommandText = sql;
 
-            SqlDataReader reader = command.ExecuteReader();
+            reader = command.ExecuteReader();
             if (reader.HasRows)
             {
                 while (reader.Read())
@@ -425,6 +491,7 @@ namespace BOM.Models
                             reader.Read();
                             child.NodeLevel = node.NodeLevel + 1;
                             child.PTmpId = node.TmpId;
+                            child.pMaterielId = node.MaterielId;
                             child.TmpId = cTmpId;
                             child.TmpNm = reader[0].ToString();
                             child.rlSeqNo = cSeqNo;
@@ -469,66 +536,6 @@ namespace BOM.Models
 
                     //获取子节点属性值
                     GetChildAttributeValues(node, child);
-
-                    
-                     //判断属性取值是否唯一
-                     uniqFlag = true;
-                     foreach (var attribute in child.Attributes)
-                     {
-                         if (attribute.Values.Count > 1)
-                         {
-                             uniqFlag = false;
-                             break;
-                         }
-                     }
-
-                     //属性取值唯一则尝试根据属性取值获取物料编码
-                     if (uniqFlag)
-                     {
-                         List<string> materielIdList = new List<string>();
-                         stringBuilder.Clear();
-                         stringBuilder.Append($"SELECT ISNULL(materielIdentfication,'NULL')  AS ID FROM {child.TmpId} WHERE");
-                         foreach (var attribute in child.Attributes.Where(m => m.Flag == "1"))
-                         {
-                             var value = (attribute.Type == "C") ? ("'" + attribute.Values[0].Trim() + "'") :attribute.Values[0].Trim() ;
-                             stringBuilder.Append($" {attribute.Id} = {value}");
-                         }
-                         command.CommandText = stringBuilder.ToString();
-                         try
-                         {
-                             reader = command.ExecuteReader();
-                             while (reader.Read())
-                             {
-
-                                 materielIdList.Add(reader["ID"].ToString());
-                             }
-                             reader.Close();
-                             if (materielIdList.Count == 1)
-                             {
-                                 child.MaterielId = materielIdList[0];
-                             }
-                             else if(materielIdList.Count > 1)
-                             {
-                                 child.MaterielId = "MultipleMateriels";
-                                 list.Add(child);
-                                 continue;
-                             }
-                         }
-                         catch (Exception e)
-                         {
-                             log.Error(string.Format($"Select AttrDefine error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                             reader.Close();
-                             throw;
-                         }
-
-                     }
-                     else{
-                         //属性取值不唯一则登记节点并停止该节点以后的遍历
-                         list.Add(child);
-                         continue;
-                     }
-                     
-
                     CreateBOMTree(ref list, child);
                 }
             }

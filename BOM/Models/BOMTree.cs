@@ -390,7 +390,6 @@ namespace BOM.Models
             List<int> listSeqNo = new List<int>();
 
             SqlDataReader reader = null;
-            LogNode(node);
 
             //如果有物料编码则直接登记节点信息,遍历其下子节点
             if (string.IsNullOrEmpty(node.MaterielId.Trim()))
@@ -411,13 +410,14 @@ namespace BOM.Models
                 {
                     List<string> materielIdList = new List<string>();
                     stringBuilder.Clear();
-                    stringBuilder.Append($"SELECT ISNULL(materielIdentfication,'NULL')  AS ID FROM {node.TmpId} WHERE");
+                    stringBuilder.Append($"SELECT ISNULL(materielIdentfication,'NULL')  AS ID FROM {node.TmpId} WHERE 1 = 1");
                     foreach (var attribute in node.Attributes.Where(m => m.Flag == "1"))
                     {
                         var value = (attribute.Type == "C") ? ("'" + attribute.Values[0].Trim() + "'") : attribute.Values[0].Trim();
-                        stringBuilder.Append($" {attribute.Id} = {value}");
+                        stringBuilder.Append($" AND {attribute.Id} = {value}");
                     }
-                    command.CommandText = stringBuilder.ToString();
+                    sql = stringBuilder.ToString();
+                    command.CommandText = sql;
                     try
                     {
                         reader = command.ExecuteReader();
@@ -454,8 +454,7 @@ namespace BOM.Models
                 }
             }
            
-            
-
+           
             list.Add(node);
 
             sql = $"SELECT CTmpId, rlSeqNo　FROM RELATION WHERE TmpId = '{node.TmpId}' and LockFlag = 1 ORDER BY CTmpId, rlSeqNo";
@@ -464,6 +463,8 @@ namespace BOM.Models
             reader = command.ExecuteReader();
             if (reader.HasRows)
             {
+                listCtmpId.Clear();
+                listSeqNo.Clear();
                 while (reader.Read())
                 {
                     //生成子节点数据
@@ -581,6 +582,7 @@ namespace BOM.Models
                 sql = $"SELECT CAttrID,CAttrValue,ValueTp,PAttrId,Gt,Lt,Eq,Excld,Gteq,Lteq FROM AttrPass WHERE TmpId = '{pNode.TmpId}' and CTmpId = '{cNode.TmpId}' AND rlSeqNo = {cNode.rlSeqNo} AND CAttrId = '{attribute.Id}' ORDER BY ValueTp";
                 command.CommandText = sql;
 
+                values.Clear();
                 relationList.Clear();
                 SqlDataReader reader = command.ExecuteReader();
 
@@ -605,7 +607,10 @@ namespace BOM.Models
 
                     }
                     reader.Close();
-
+                    verified = true;
+                    midValues.Clear();
+                    origValueType = "";
+                    valueTpCount = 0;
                     foreach (var attrPass in relationList)
                     {
                         cAttrId = attrPass.CAttrId;
@@ -645,6 +650,7 @@ namespace BOM.Models
                         //如果同组valuetype中有验证不过的,则该组valuetype后续记录都跳过
                         if (!verified)
                         {
+                            midValues.Clear();
                             continue;
                         }
 
@@ -963,11 +969,11 @@ namespace BOM.Models
                         }
                     }
 
+
                     if (verified && valueTpCount > 0)
                     {
                         values.Union(midValues);
                     }
-
                     //如果根据父节点属性无法计算子节点属性值,并且子节点属性有缺省值,则赋缺省值
                     if (values.Count == 0 && !string.IsNullOrEmpty(defaultValue))
                     {
@@ -975,7 +981,7 @@ namespace BOM.Models
                     }
                     if (values.Count > 0)
                     {
-                        attribute.Values = values;
+                        attribute.Values.AddRange(values);
                     }
                 }
                 else {
@@ -990,8 +996,6 @@ namespace BOM.Models
             StringBuilder returnString = new StringBuilder();
             if (cAttrType == "C")//字符型
             {
-
-
                 var elements = Expression.Split('+');
                 foreach (var element in elements)
                 {
@@ -1311,11 +1315,13 @@ namespace BOM.Models
         private void LogNode(NodeInfo node)
         {
             log.Info("=====================");
-            log.Info("NodeLevel" + node.NodeLevel);
-            log.Info("TmpId" + node.TmpId);
-            log.Info("---------------------------");
+            log.Info("NodeLevel=" + node.NodeLevel);
+            log.Info("ptmpid="+node.PTmpId+"  pmaterielid="+node.pMaterielId);
+            log.Info("TmpId=" + node.TmpId+"  materelid="+node.MaterielId);
             foreach (var attr in node.Attributes)
             {
+                log.Info("---------------------------");
+
                 log.Info(attr.Id + "----" + attr.Name+":");
                 foreach (var value in attr.Values)
                 {

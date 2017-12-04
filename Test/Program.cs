@@ -12,6 +12,9 @@ namespace Test
     {
         static void Main(string[] args)
         {
+            log4net.Config.XmlConfigurator.Configure();
+            log4net.ILog log = log4net.LogManager.GetLogger("TEST");
+            log.Info("hello");
             //AttrDefineOperation attrDefine = new AttrDefineOperation();
             //attrDefine.Insert("tmpid","attid","attname","C","tao");
             //attrDefine.Update("tmpid", "attid", "attname", "C", "tmpid1","tmpid2","tmpid3","T","sun");
@@ -114,29 +117,113 @@ namespace Test
 
 
             //测试利用数据库计算表达式
-            SqlConnection sqlConnection = DBConnection.OpenConnection();
-            try
-            {
-                string sql = "(9*2+3*2)/7";
-                using (SqlCommand cmd = new SqlCommand())
-                {
-                    cmd.Connection = sqlConnection;
-                    cmd.CommandText = $"select {sql} as result";
-                    string i = cmd.ExecuteScalar().ToString();
-                    Console.WriteLine( "["+i+"]");
+            //SqlConnection sqlConnection = DBConnection.OpenConnection();
+            //try
+            //{
+            //    string sql = "(9*2+3*2)/7";
+            //    using (SqlCommand cmd = new SqlCommand())
+            //    {
+            //        cmd.Connection = sqlConnection;
+            //        cmd.CommandText = $"select {sql} as result";
+            //        string i = cmd.ExecuteScalar().ToString();
+            //        Console.WriteLine( "["+i+"]");
 
+            //    }
+            //}
+            //catch (Exception e)
+            //{
+            //    Console.WriteLine(e.StackTrace);
+            //    Console.WriteLine("error");
+            //}
+            //finally
+            //{
+            //    DBConnection.CloseConnection(sqlConnection);
+            //}
+
+            /*测试根据父节点属性值计算子节点属性值
+            SqlConnection sqlConnection = DBConnection.OpenConnection();
+            SqlCommand command = new SqlCommand();
+
+            SqlTransaction transaction = sqlConnection.BeginTransaction();
+            List<NodeInfo> list = new List<NodeInfo>();
+            command.Connection = sqlConnection;
+            command.Transaction = transaction;
+
+            BOMTree bom = new BOMTree(sqlConnection, command, transaction);
+            NodeInfo p = new NodeInfo();
+                           
+            NodeInfo c = new NodeInfo();
+
+            p.TmpId = "T538";
+            p.rlSeqNo = 0;
+            p.NodeLevel = 1;
+            p.Attributes.Add(new TempletAttribute { Flag = "0", Id = "ABCcode",Name="ABC",Type="C", Values = { "0"} });
+            p.Attributes.Add(new TempletAttribute { Flag = "0", Id = "GONGSS", Name = "工时", Type = "N", Values = { "0.00" } });
+            p.Attributes.Add(new TempletAttribute { Flag = "0", Id = "guige", Name = "规格尺寸", Type = "C", Values = { "TU14-0.65-5.0" } });
+            p.Attributes.Add(new TempletAttribute { Flag = "0", Id = "JILDW", Name = "计量单位", Type = "C", Values = { "台" } });
+            p.Attributes.Add(new TempletAttribute { Flag = "0", Id = "KUW", Name = "库位", Type = "C", Values = { "CP" } });
+            p.Attributes.Add(new TempletAttribute { Flag = "0", Id = "LS", Name = "批量规则", Type = "N", Values = { "0.00" } });
+            p.Attributes.Add(new TempletAttribute { Flag = "0", Id = "SHENGCLX", Name = "生产类型", Type = "C", Values = { "4" } });
+            p.Attributes.Add(new TempletAttribute { Flag = "0", Id = "SS", Name = "安全库存", Type = "N", Values = { "0.00" } });
+            p.Attributes.Add(new TempletAttribute { Flag = "0", Id = "tuhao", Name = "图号", Type = "C", Values = { "WU" } });
+            p.Attributes.Add(new TempletAttribute { Flag = "0", Id = "workgroup", Name = "生产组", Type = "C", Values = { "ZP" } });
+            p.Attributes.Add(new TempletAttribute { Flag = "1", Id = "ANZFS", Name = "安装方式", Type = "C", Values = { "/" } });
+            p.Attributes.Add(new TempletAttribute { Flag = "1", Id = "CHANPDH", Name = "产品代号", Type = "C", Values = { "TU" } });
+            p.Attributes.Add(new TempletAttribute { Flag = "1", Id = "DIANJXH", Name = "电机型号", Type = "C", Values = { "WU" } });
+            p.Attributes.Add(new TempletAttribute { Flag = "1", Id = "FUJJ", Name = "附加级", Type = "C", Values = { "VU8" } });
+            p.Attributes.Add(new TempletAttribute { Flag = "1", Id = "JIZH", Name = "机座号", Type = "C", Values = { "8" } });
+            p.Attributes.Add(new TempletAttribute { Flag = "1", Id = "N", Name = "转速", Type = "N", Values = { "5.234" } });
+            p.Attributes.Add(new TempletAttribute { Flag = "1", Id = "P", Name = "额定功率", Type = "N", Values = { "0.75" } });
+            p.Attributes.Add(new TempletAttribute { Flag = "1", Id = "TEB", Name = "特标", Type = "C", Values = { "/" } });
+            p.Attributes.Add(new TempletAttribute { Flag = "1", Id = "XIANGTJG", Name = "箱体结构", Type = "C", Values = { "V" } });
+
+
+            c.TmpId = "T267";
+            c.PTmpId = "T538";
+            c.NodeLevel = 2;
+            c.rlSeqNo = 0;
+            c.Attributes.Add(new TempletAttribute { Flag = "0", Id = "ABCcode", Name = "ABC", Type = "C", Values = { "" } });
+            c.Attributes.Add(new TempletAttribute { Flag = "0", Id = "GONGSS", Name = "工时", Type = "N", Values = { "" } });
+            c.Attributes.Add(new TempletAttribute { Flag = "0", Id = "guige", Name = "规格尺寸", Type = "C", Values = { "" } });
+            c.Attributes.Add(new TempletAttribute { Flag = "0", Id = "JILDW", Name = "计量单位", Type = "C", Values = { "" } });
+            c.Attributes.Add(new TempletAttribute { Flag = "0", Id = "KUW", Name = "库位", Type = "C", Values = { "" } });
+            c.Attributes.Add(new TempletAttribute { Flag = "0", Id = "LS", Name = "批量规则", Type = "N", Values = { "" } });
+            c.Attributes.Add(new TempletAttribute { Flag = "0", Id = "SHENGCLX", Name = "生产类型", Type = "C", Values = { "" } });
+            c.Attributes.Add(new TempletAttribute { Flag = "0", Id = "SS", Name = "安全库存", Type = "N", Values = { "" } });
+            c.Attributes.Add(new TempletAttribute { Flag = "0", Id = "tuhao", Name = "图号", Type = "C", Values = { "" } });
+            c.Attributes.Add(new TempletAttribute { Flag = "0", Id = "workgroup", Name = "生产组", Type = "C", Values = { "" } });
+            c.Attributes.Add(new TempletAttribute { Flag = "1", Id = "BIANMTH", Name = "图号编码", Type = "C", Values = { "" } });
+
+            printnode(p);
+
+            bom.GetChildAttributeValues(p,c);
+
+            printnode(c);
+
+            DBConnection.CloseConnection(sqlConnection);
+            */
+
+            Console.WriteLine(Convert.ToDecimal(".25"));
+
+        }
+
+        public static void printnode(NodeInfo node)
+        {
+            Console.WriteLine("=====================");
+            Console.WriteLine("NodeLevel=" + node.NodeLevel);
+            Console.WriteLine("ptmpid=" + node.PTmpId + "  pmaterielid=" + node.pMaterielId);
+            Console.WriteLine("TmpId=" + node.TmpId + "  materelid=" + node.MaterielId);
+            foreach (var attr in node.Attributes)
+            {
+                Console.WriteLine("---------------------------");
+
+                Console.WriteLine(attr.Id + "----" + attr.Name + ":");
+                foreach (var value in attr.Values)
+                {
+                    Console.WriteLine("=>" + value);
                 }
             }
-            catch (Exception e)
-            {
-                Console.WriteLine(e.StackTrace);
-                Console.WriteLine("error");
-            }
-            finally
-            {
-                DBConnection.CloseConnection(sqlConnection);
-            }
-
+            Console.WriteLine("=====================");
         }
     }
 

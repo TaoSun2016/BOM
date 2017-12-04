@@ -1050,28 +1050,8 @@ namespace BOM.Models
             }
         }
 
-        //保存BOM树
-        public void SaveBOMTree(List<NodeInfo> nodes, NodeInfo node, decimal count)
-        {
-            List<NodeInfo> childList = new List<NodeInfo>();
-
-            SaveNode(node, count);
-            childList = nodes.Where(m => m.PTmpId == node.TmpId).ToList<NodeInfo>();
-            if (childList.Count == 0)
-            {
-                return;
-            }
-            else
-            {
-                foreach (var childnode in childList)
-                {
-                    SaveBOMTree(nodes, childnode, childnode.Count);
-                }
-            }
-        }
-
         //保存节点
-        public bool SaveNode(NodeInfo node, decimal count)
+        public bool SaveNode(NodeInfo node)
         {
             int result = -1;
             bool hasPrivateAttribute = false;
@@ -1165,7 +1145,7 @@ namespace BOM.Models
                         long nextNo = Convert.ToInt64(dataReader[0].ToString());
                         dataReader.Close();
 
-                        materielIdentification = $"{node.TmpId}" + Convert.ToString(nextNo, 8);
+                        materielIdentification = $"{node.TmpId}9" + Convert.ToString(nextNo, 8);
                         nextNo += 1;
                         sql = $"UPDATE SEQ_NO SET NEXT_NO = {nextNo} WHERE IND_KEY = '{node.TmpId}'";
                     }
@@ -1253,6 +1233,10 @@ namespace BOM.Models
                 }
                 node.MaterielId = materielIdentification;
             }
+            else
+            {
+                //如果前台上送有物料编码. 当前台有物料编码时是否还允许用户修改物料的属性,如果允许修改后如果和其他物料属性值一样怎么办?
+            }
 
             //生成DCM码
             int dcm = 0;
@@ -1295,10 +1279,9 @@ namespace BOM.Models
                 throw;
             }
 
-            //登记表BOM //获取数量
-            var totalAmount = Convert.ToDecimal(node.Attributes.Find(m => m.Id == "_danyl").Values[0]) * count;
+            //登记表BOM 
 
-            sql = $"INSERT INTO BOM VALUES ('{node.pMaterielId}','{node.PTmpId}','{node.MaterielId}','{node.TmpId}','{totalAmount}',{node.rlSeqNo},{node.pMaterielId})";
+            sql = $"INSERT INTO BOM VALUES ('{node.pMaterielId}','{node.PTmpId}','{node.MaterielId}','{node.TmpId}','{node.Count}',{node.rlSeqNo},{node.pMaterielId})";
 
             try
             {

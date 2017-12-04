@@ -137,14 +137,17 @@ namespace BOM.Controllers
             SqlConnection sqlConnection = DBConnection.OpenConnection();
             SqlCommand command = new SqlCommand();
             SqlTransaction transaction = sqlConnection.BeginTransaction();
-            NodeInfo node = list.Find(m => m.NodeLevel == 1);
+            
 
             BOMTree bomTree = new BOMTree(sqlConnection, command, transaction);
 
 
             try
             {
-                bomTree.SaveBOMTree(list, node, count);
+                foreach (var node in list)
+                {
+                    bomTree.SaveNode(node);
+                }
             }
             catch (Exception e)
             {

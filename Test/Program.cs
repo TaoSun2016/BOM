@@ -209,21 +209,22 @@ namespace Test
 
         public static void printnode(NodeInfo node)
         {
-            Console.WriteLine("=====================");
-            Console.WriteLine("NodeLevel=" + node.NodeLevel);
-            Console.WriteLine("ptmpid=" + node.PTmpId + "  pmaterielid=" + node.pMaterielId);
-            Console.WriteLine("TmpId=" + node.TmpId + "  materelid=" + node.MaterielId);
+            log4net.ILog log = log4net.LogManager.GetLogger("TEST");
+            log.Info("=====================");
+            log.Info("NodeLevel=" + node.NodeLevel);
+            log.Info("ptmpid=" + node.PTmpId + "  pmaterielid=" + node.pMaterielId);
+            log.Info("TmpId=" + node.TmpId + "  materelid=" + node.MaterielId);
             foreach (var attr in node.Attributes)
             {
-                Console.WriteLine("---------------------------");
+                log.Info("---------------------------");
 
-                Console.WriteLine(attr.Id + "----" + attr.Name + ":");
+                log.Info(attr.Id + "----" + attr.Name + ":");
                 foreach (var value in attr.Values)
                 {
-                    Console.WriteLine("=>" + value);
+                    log.Info("=>" + value);
                 }
             }
-            Console.WriteLine("=====================");
+            log.Info("=====================");
         }
     }
 

@@ -449,6 +449,7 @@ namespace BOM.Models
                 else
                 {
                     //属性取值不唯一则登记节点并停止该节点以后的遍历
+                    node.MaterielId = "MultiplePropertyValues";
                     list.Add(node);
                     return;
                 }

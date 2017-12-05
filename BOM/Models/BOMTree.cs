@@ -1051,7 +1051,7 @@ namespace BOM.Models
         }
 
         //保存节点
-        public bool SaveNode(NodeInfo node)
+        public bool SaveNode( NodeInfo node)
         {
             int result = -1;
             bool hasPrivateAttribute = false;
@@ -1089,6 +1089,7 @@ namespace BOM.Models
 
                     //Check duplicated records
                     StringBuilder builder = new StringBuilder($"SELECT COUNT(*) FROM {node.TmpId} WHERE");
+                    StringBuilder mIdBuilder = new StringBuilder($"SELECT materielIdentfication FROM {node.TmpId} WHERE");
 
                     int counter = 0;
                     var privateAttributes = node.Attributes.Where(m => m.Flag == "1");
@@ -1098,12 +1099,14 @@ namespace BOM.Models
                         if (attrbute.Type == "C")
                         {
                             builder.Append($" {attrbute.Id} = '{attrbute.Values[0]}'");
+                            mIdBuilder.Append($" {attrbute.Id} = '{attrbute.Values[0]}'");
                             insertBuilder.Append($" {attrbute.Id},");
                             insertValues.Append($" '{attrbute.Values[0]}',");
                         }
                         else
                         {
                             builder.Append($" {attrbute.Id} = {attrbute.Values[0]}");
+                            mIdBuilder.Append($" {attrbute.Id} = {attrbute.Values[0]}");
                             insertBuilder.Append($" {attrbute.Id},");
                             insertValues.Append($" {attrbute.Values[0]},");
                         }
@@ -1111,6 +1114,7 @@ namespace BOM.Models
                         if (counter != privateAttributes.Count())
                         {
                             builder.Append($" AND");
+                            mIdBuilder.Append($" AND");
                         }
                     }
                     sql = builder.ToString();
@@ -1124,114 +1128,138 @@ namespace BOM.Models
                         log.Error(string.Format($"Select private attribute Error!\nsql[{sql}]\nError[{e.StackTrace}]"));
                         throw;
                     }
-                    if (result > 0)
-                    {
-                        log.Error(string.Format($"The private attrbutes have already exsited!\nsql[{sql}]\n"));
-                        throw new Exception("The private attrbutes have already exsited!!");
-                    }
-                }
-
-                //Get Materiel Identification
-                sql = $"SELECT NEXT_NO FROM SEQ_NO WHERE Ind_Key = '{node.TmpId}'";
-                try
-                {
-                    command.CommandText = sql;
-                    dataReader = command.ExecuteReader();
-
-                    if (dataReader.HasRows)
-                    {
-                        dataReader.Read();
-                        var tmp = dataReader[0];
-                        long nextNo = Convert.ToInt64(dataReader[0].ToString());
-                        dataReader.Close();
-
-                        materielIdentification = $"{node.TmpId}9" + Convert.ToString(nextNo, 8);
-                        nextNo += 1;
-                        sql = $"UPDATE SEQ_NO SET NEXT_NO = {nextNo} WHERE IND_KEY = '{node.TmpId}'";
-                    }
-                    else
-                    {
-                        log.Error(string.Format($"Can't find record in table SEQ_NO.[{sql}]"));
-                        throw new Exception(string.Format($"Can't find record in table SEQ_NO.[{sql}]"));
-                    }
-
-                    command.CommandText = sql;
-                    result = command.ExecuteNonQuery();
+                    //找不到,则新生成物料编码
                     if (result == 0)
                     {
-                        log.Error($"No record is updated,TmpID=[{node.TmpId}]");
+                        //Get Materiel Identification
+                        sql = $"SELECT NEXT_NO FROM SEQ_NO WHERE Ind_Key = '{node.TmpId}'";
+                        try
+                        {
+                            command.CommandText = sql;
+                            dataReader = command.ExecuteReader();                          
+                            if (dataReader.HasRows)
+                            {
+                                dataReader.Read();
+                                long nextNo = Convert.ToInt64(dataReader[0].ToString());
+                                dataReader.Close();
 
-                        throw new Exception($"No record is updated,TmpID=[{node.TmpId}]");
+                                materielIdentification = $"{node.TmpId}9" + Convert.ToString(nextNo, 8);
+                                nextNo += 1;
+                                sql = $"UPDATE SEQ_NO SET NEXT_NO = {nextNo} WHERE IND_KEY = '{node.TmpId}'";
+                            }
+                            else
+                            {
+                                log.Error(string.Format($"Can't find record in table SEQ_NO.[{sql}]"));
+                                throw new Exception(string.Format($"Can't find record in table SEQ_NO.[{sql}]"));
+                            }
+
+                            command.CommandText = sql;
+                            result = command.ExecuteNonQuery();
+                            if (result == 0)
+                            {
+                                log.Error($"No record is updated,TmpID=[{node.TmpId}]");
+
+                                throw new Exception($"No record is updated,TmpID=[{node.TmpId}]");
+                            }
+                        }
+                        catch (Exception e)
+                        {
+                            log.Error($"Get MaterielIdentification Error,TmpID=[{node.TmpId}]sql=[{sql}]error[{e.StackTrace}][{e}][{e.Message}]");
+                            dataReader.Close();
+
+                            throw;
+                        }
+
+                        //Register private attribute values
+                        if (hasPrivateAttribute)
+                        {
+                            sql = insertBuilder.ToString() + $" materielIdentfication" + insertValues.ToString() + $" '{materielIdentification}')";
+
+                            command.CommandText = sql;
+                            try
+                            {
+                                result = command.ExecuteNonQuery();
+                            }
+                            catch (Exception e)
+                            {
+                                log.Error(string.Format($"Register private attribute Error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+
+                                throw;
+                            }
+                            if (result == 0)
+                            {
+                                log.Error(string.Format($"No private attrbutes is registered!\nsql[{sql}]\n"));
+
+                                throw new Exception("No private attrbutes is registered!");
+                            }
+                        }
+
+                        //Register default attribute values
+                        //前台必须给所有的缺省属性赋值,没有值赋缺省值
+                        insertBuilder = new StringBuilder($"INSERT INTO DeafaultAttr (");
+                        insertValues = new StringBuilder($" ) VALUES (");
+                        var defaultAttributes = node.Attributes.Where(m => m.Flag == "0");
+                        foreach (var defaultAttrbute in defaultAttributes)
+                        {
+                            insertBuilder.Append($" {defaultAttrbute.Id},");
+                            if (defaultAttrbute.Type == "C")
+                            {
+                                insertValues.Append($" '{defaultAttrbute.Values[0]}',");
+                            }
+                            else
+                            {
+                                insertValues.Append($" {defaultAttrbute.Values[0]},");
+                            }
+                        }
+                        sql = insertBuilder.ToString() + $" materielIdentfication" + insertValues.ToString() + $" '{materielIdentification}')";
+
+                        command.CommandText = sql;
+                        try
+                        {
+                            result = command.ExecuteNonQuery();
+                        }
+                        catch (Exception e)
+                        {
+                            log.Error(string.Format($"Register default attribute Error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                            throw;
+                        }
+                        if (result == 0)
+                        {
+                            log.Error(string.Format($"No default attrbutes is registered!\nsql[{sql}]\n"));
+
+                            throw new Exception("No default attrbutes is registered!");
+                        }
+                        node.MaterielId = materielIdentification;
+
                     }
-                }
-                catch (Exception e)
-                {
-                    log.Error($"Get MaterielIdentification Error,TmpID=[{node.TmpId}]sql=[{sql}]error[{e.StackTrace}][{e}][{e.Message}]");
-                    dataReader.Close();
-
-                    throw;
-                }
-
-                //Register private attribute values
-                if (hasPrivateAttribute)
-                {
-                    sql = insertBuilder.ToString() + $" materielIdentfication" + insertValues.ToString() + $" '{materielIdentification}')";
-
-                    command.CommandText = sql;
-                    try
+                    else if (result == 1)//找到,使用找到的物料编码
                     {
-                        result = command.ExecuteNonQuery();
+                        sql = mIdBuilder.ToString();
+                        command.CommandText = sql;
+                        try
+                        {
+                            dataReader = command.ExecuteReader();
+                            dataReader.Read();
+                            materielIdentification = dataReader[0].ToString().Trim();
+                            node.MaterielId = materielIdentification;
+
+                        }
+                        catch (Exception e)
+                        {
+                            log.Error(string.Format($"Select materiel identification Error!\nsql[{sql}]\nErrorMessage[{e.Message}]\nErrorStack[{e.StackTrace}]"));
+                            throw;
+                        }
+                        finally
+                        {
+                            dataReader.Close();
+                        }
                     }
-                    catch (Exception e)
+                    else//找到多条,报错
                     {
-                        log.Error(string.Format($"Register private attribute Error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-
-                        throw;
+                        log.Error(string.Format($"Found more than one records!\nsql[{sql}]\n"));
+                        throw new Exception("Found more than one records!!!");
                     }
-                    if (result == 0)
-                    {
-                        log.Error(string.Format($"No private attrbutes is registered!\nsql[{sql}]\n"));
-
-                        throw new Exception("No private attrbutes is registered!");
-                    }
-                }
-
-                //Register default attribute values
-                //前台必须给所有的缺省属性赋值,没有值赋缺省值
-                insertBuilder = new StringBuilder($"INSERT INTO DeafaultAttr (");
-                insertValues = new StringBuilder($" ) VALUES (");
-                var defaultAttributes = node.Attributes.Where(m => m.Flag == "0");
-                foreach (var defaultAttrbute in defaultAttributes)
-                {
-                    insertBuilder.Append($" {defaultAttrbute.Id},");
-                    if (defaultAttrbute.Type == "C")
-                    {
-                        insertValues.Append($" '{defaultAttrbute.Values[0]}',");
-                    }
-                    else
-                    {
-                        insertValues.Append($" {defaultAttrbute.Values[0]},");
-                    }
-                }
-                sql = insertBuilder.ToString() + $" materielIdentfication" + insertValues.ToString() + $" '{materielIdentification}')";
-
-                command.CommandText = sql;
-                try
-                {
-                    result = command.ExecuteNonQuery();
-                }
-                catch (Exception e)
-                {
-                    log.Error(string.Format($"Register default attribute Error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                    throw;
-                }
-                if (result == 0)
-                {
-                    log.Error(string.Format($"No default attrbutes is registered!\nsql[{sql}]\n"));
-
-                    throw new Exception("No default attrbutes is registered!");
-                }
-                node.MaterielId = materielIdentification;
+                }               
             }
             else
             {
@@ -1281,7 +1309,8 @@ namespace BOM.Models
 
             //登记表BOM 
 
-            sql = $"INSERT INTO BOM VALUES ('{node.pMaterielId}','{node.PTmpId}','{node.MaterielId}','{node.TmpId}','{node.Count}',{node.rlSeqNo},{node.pMaterielId})";
+            sql = $"INSERT INTO BOM (materielIdentfication, TmpId, CmId, CTmpId, CNum, rlSeqNo) VALUES "+
+                $"('{node.pMaterielId}','{node.PTmpId}','{node.MaterielId}','{node.TmpId}','{node.Count}',{node.rlSeqNo})";
 
             try
             {
@@ -1292,6 +1321,12 @@ namespace BOM.Models
             {
                 log.Error($"Insert BOM Error,sql=[{sql}]error[{e.StackTrace}][{e}][{e.Message}]");
                 throw;
+            }
+            if (result == 0)
+            {
+                log.Error($"No record is inserted in BOM,sql=[{sql}]");
+
+                throw new Exception($"No record is inserted in BOM,sql=[{sql}]");
             }
             return true;
         }
@@ -1322,6 +1357,7 @@ namespace BOM.Models
         public int NodeLevel { get; set; }
         public string PTmpId { get; set; }
         public string pMaterielId { get; set; }
+        public int PrlSeqNo { get; set; }
         public string TmpId { get; set; }
         public string TmpNm { get; set; }
         public string MaterielId { get; set; }

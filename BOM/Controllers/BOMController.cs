@@ -20,7 +20,7 @@ namespace BOM.Controllers
         {
             SqlConnection sqlConnection = DBConnection.OpenConnection();
             List<NodeInfo> list = new List<NodeInfo>();
-            
+
             BOMTree bomTree = new BOMTree();
             try
             {
@@ -46,11 +46,11 @@ namespace BOM.Controllers
         [Route("ApplyCode")]
         public string ApplyCode(NodeInfo nodeInfo)
         {
-            
+
             BOMTree bomTree = new BOMTree();
             try
             {
-              return  bomTree.ApplyCode(nodeInfo);
+                return bomTree.ApplyCode(nodeInfo);
             }
             catch (Exception e)
             {
@@ -63,7 +63,7 @@ namespace BOM.Controllers
                 };
                 throw new HttpResponseException(responseMessge);
             }
-            
+
         }
 
 
@@ -75,7 +75,7 @@ namespace BOM.Controllers
             BOMTree bomTree = new BOMTree();
             try
             {
-                bomTree.DeleteNode( pMaterielId, materielId, rlSeqNo);
+                bomTree.DeleteNode(pMaterielId, materielId, rlSeqNo);
             }
             catch (Exception e)
             {
@@ -97,13 +97,13 @@ namespace BOM.Controllers
         {
             SqlConnection sqlConnection = DBConnection.OpenConnection();
             SqlCommand command = new SqlCommand();
-            
+
             SqlTransaction transaction = sqlConnection.BeginTransaction();
             List<NodeInfo> list = new List<NodeInfo>();
             command.Connection = sqlConnection;
             command.Transaction = transaction;
 
-            BOMTree bomTree = new BOMTree(sqlConnection,command,transaction);
+            BOMTree bomTree = new BOMTree(sqlConnection, command, transaction);
 
 
             try
@@ -132,12 +132,15 @@ namespace BOM.Controllers
 
         [HttpPost]
         [Route("SaveBOM")]
-        public void SaveBOM(decimal count, List<NodeInfo> list)
+        public void SaveBOM(List<NodeInfo> list)
         {
+            bool newMaterielId = false;
             SqlConnection sqlConnection = DBConnection.OpenConnection();
             SqlCommand command = new SqlCommand();
             SqlTransaction transaction = sqlConnection.BeginTransaction();
-            
+            command.Connection = sqlConnection;
+            command.Transaction = transaction;
+
 
             BOMTree bomTree = new BOMTree(sqlConnection, command, transaction);
 
@@ -146,13 +149,28 @@ namespace BOM.Controllers
             {
                 foreach (var node in list)
                 {
+                    newMaterielId = (string.IsNullOrEmpty(node.MaterielId)) ? true : false;
+                    
                     bomTree.SaveNode(node);
+
+                    if (newMaterielId)
+                    {
+                       foreach(var cnode in  list.Where(m => m.NodeLevel == (node.NodeLevel + 1) && 
+                                                             m.PTmpId == node.TmpId && 
+                                                             m.PrlSeqNo == node.rlSeqNo))
+                        {
+                            cnode.pMaterielId = node.MaterielId;
+                        }
+                    }
                 }
             }
             catch (Exception e)
             {
                 string logMessage = string.Format($"Save BOM Tree error!\n {e.StackTrace}");
                 log.Error(logMessage);
+                transaction.Rollback();
+                command.Dispose();
+                DBConnection.CloseConnection(sqlConnection);
                 var responseMessge = new HttpResponseMessage(HttpStatusCode.InternalServerError)
                 {
                     Content = new StringContent(logMessage),
@@ -160,12 +178,9 @@ namespace BOM.Controllers
                 };
                 throw new HttpResponseException(responseMessge);
             }
-            finally
-            {
-                command.Dispose();
-                DBConnection.CloseConnection(sqlConnection);
-            }
-
+            transaction.Commit();
+            command.Dispose();
+            DBConnection.CloseConnection(sqlConnection);
         }
     }
 }

@@ -15,7 +15,7 @@ namespace BOM.Controllers
         log4net.ILog log = log4net.LogManager.GetLogger("Attribute");
         AttrDefineOperation operation = new AttrDefineOperation();
 
-
+        /* 只用一个批量接口
         [HttpGet]
         [Route("GetAll")]
         public List<AttrDefine> Get()
@@ -56,6 +56,7 @@ namespace BOM.Controllers
         {
             operation.Delete(tmpId, attrId, attrNm, attrTp);
         }
+        */
 
         [HttpPost]
         [Route("Batch")]

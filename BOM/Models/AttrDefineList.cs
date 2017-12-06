@@ -22,6 +22,27 @@ namespace BOM.Models
 
                 foreach (AttrDefine attribute in list)
                 {
+                    sql = $"SELECT COUNT(*) FROM　ＴmpInfo WHERE TmpId = '{attribute.TmpId}'";
+                    command.CommandText = sql;
+                    try
+                    {
+                        result = (int)command.ExecuteScalar();
+                    }
+                    catch (Exception e)
+                    {
+                        log.Error(string.Format($"Update attrdefine error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                        sqlTransaction.Rollback();
+                        DBConnection.CloseConnection(sqlConnection);
+                        throw;
+                    }
+                    if (result == 0)
+                    {
+                        log.Error(string.Format($"无此模板号!TmpId={attribute.TmpId}\n sql[{sql}]\n"));
+                        sqlTransaction.Rollback();
+                        DBConnection.CloseConnection(sqlConnection);
+                        throw new Exception($"无此模板[{attribute.TmpId}]!");
+                    }
+
                     switch (attribute.Option)
                     {
                         case 'I':
@@ -35,6 +56,10 @@ namespace BOM.Models
                             break;
                         case 'D':
                             sql = $"DELETE FROM AttrDefine WHERE TmpId = {attribute.TmpId} AND AttrId='{attribute.AttrId}' AND AttrNm='{attribute.AttrNm}' AND AttrTp='{attribute.AttrTp}'";
+                            break;
+                        case 'L':
+                            DateTime lockDate = DateTime.Now;
+                            sql = $"UPDATE AttrDefine SET LockFlag = '1'  WHERE TmpId = '{attribute.TmpId}' AND AttrId='{attribute.AttrId}' AND AttrNm='{attribute.AttrNm}' AND AttrTp='{attribute.AttrTp}'";
                             break;
                         default:
                             log.Error(string.Format($"数据操作选项错误!\nOption[{attribute.Option}]"));

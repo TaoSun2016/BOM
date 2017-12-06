@@ -175,6 +175,27 @@ namespace BOM.Models
                     throw new Exception("模板名称重复!");
                 }
 
+                //检查父模板是否存在
+                sql = $"SELECT COUNT(*) FROM TmpInfo WHERE TmpId = '{parentTempletId}' ";
+                command.CommandText = sql;
+                try
+                {
+                    result = (int)command.ExecuteScalar();
+                }
+                catch (Exception e)
+                {
+                    log.Error(string.Format($"Select from table TmpInfo error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                    DBConnection.CloseConnection(sqlConnection);
+                    throw;
+                }
+
+                if (result != 1)
+                {
+                    log.Error(string.Format($"父模板不存在!TmpId=[{parentTempletId}]\nsql[{sql}]\n"));
+                    DBConnection.CloseConnection(sqlConnection);
+                    throw new Exception("父模板不存在!");
+                }
+
                 //登记新模板信息
                 SeqNo seqNo = new SeqNo();
                 string tmpId = seqNo.GetBaseSeqNo();
@@ -203,7 +224,7 @@ namespace BOM.Models
 
                 //登记父子模板关系表Relation
                 //获取Relation.rlSeqNo的值
-                sql = $"SELECT ISNULL(MAX(rlSeqNo),-1) FROM RELATION WHERE TmpId = {parentTempletId} and CTmpId = {tmpId}";
+                sql = $"SELECT ISNULL(MAX(rlSeqNo),-1) FROM RELATION WHERE TmpId = '{parentTempletId}' and CTmpId = '{tmpId}'";
                 command.CommandText = sql;
                 try
                 {
@@ -242,7 +263,7 @@ namespace BOM.Models
 
                 //登记数据库表AttrPass
                
-                sql = $"INSERT INTO AttrPass (TmpId, CTmpId, CAttrId, CAttrValue, ValueTp, PAttrId, Gt, Lt, Eq, Excld, Gteq, Lteq, CrtDate, Crter, rlSeqNo) VALUES ({parentTempletId},{tmpId},'_danyl', 0, '', '', '', '', '', '', '', '', '{DateTime.Now}','{creater}',{rlSeqNo})";
+                sql = $"INSERT INTO AttrPass (TmpId, CTmpId, CAttrId, CAttrValue, ValueTp, PAttrId, Gt, Lt, Eq, Excld, Gteq, Lteq, CrtDate, Crter, rlSeqNo) VALUES ({parentTempletId},{tmpId},'_danyl', 0, '0', '0', '', '', '', '', '', '', '{DateTime.Now}','{creater}',{rlSeqNo})";
                 command.CommandText = sql;
                 try
                 {

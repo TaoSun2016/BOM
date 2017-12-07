@@ -29,7 +29,7 @@ namespace BOM.Models
 
         //Open BOM Tree
         //测试暂时将tmpid设为string型
-        public void FindChildrenTree(SqlConnection connection, ref List<NodeInfo> list, string pTmpid, string tmpId, int rlSeqNo, int level)
+        public void FindChildrenTree(SqlConnection connection, ref List<NodeInfo> list, string pTmpid, int prlSeqNo, string tmpId, int rlSeqNo, int level)
         {
             string sql = null;
             NodeInfo nodeInfo = new NodeInfo();
@@ -40,8 +40,6 @@ namespace BOM.Models
 
             SqlDataReader dataReader = null;
 
-            //log.Info("=================================================================");
-            //log.Info($"tmpid = [{tmpId}] seqno=[{rlSeqNo}] level=[{level}]");
             using (SqlCommand command = new SqlCommand())
             {
                 command.Connection = connection;
@@ -57,6 +55,7 @@ namespace BOM.Models
                         dataReader.Read();
                         nodeInfo.NodeLevel = level;
                         nodeInfo.PTmpId = pTmpid;
+                        nodeInfo.PrlSeqNo = prlSeqNo;
                         nodeInfo.TmpId = tmpId;
                         nodeInfo.TmpNm = dataReader[0].ToString();
                         nodeInfo.rlSeqNo = rlSeqNo;
@@ -132,7 +131,7 @@ namespace BOM.Models
 
                 for (int i = 0; i < listCTmpId.Count(); i++)
                 {
-                    FindChildrenTree(connection, ref list, tmpId, listCTmpId[i], listSeqNo[i], level + 1);
+                    FindChildrenTree(connection, ref list, tmpId, rlSeqNo, listCTmpId[i], listSeqNo[i], level + 1);
                 }
             }
 
@@ -494,6 +493,7 @@ namespace BOM.Models
                             child.NodeLevel = node.NodeLevel + 1;
                             child.PTmpId = node.TmpId;
                             child.pMaterielId = node.MaterielId;
+                            child.PrlSeqNo = node.rlSeqNo;
                             child.TmpId = cTmpId;
                             child.TmpNm = reader[0].ToString();
                             child.rlSeqNo = cSeqNo;
@@ -1369,6 +1369,7 @@ namespace BOM.Models
             NodeLevel = 0;
             PTmpId = "";
             pMaterielId = "";
+            PrlSeqNo = 0;
             TmpId = "";
             TmpNm = "";
             MaterielId = "";

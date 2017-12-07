@@ -17,8 +17,8 @@ namespace BOM.Models
 
         public void ExecuteBatch()
         {
-            long TmpId = -1;
-            long CTmpId = -1;
+            string TmpId = "";
+            string CTmpId = "";
             int rlSeqNo = -1;
             string Crter = null;
             string LstUpdter = null;
@@ -35,27 +35,26 @@ namespace BOM.Models
                 command.Transaction = sqlTransaction;
                 foreach (var state in list)
                 {
-                    TmpId = (long)state.TmpId;
-                    CTmpId = (long)state.CTmpId;
+                    TmpId = state.TmpId;
+                    CTmpId = state.CTmpId;
                     rlSeqNo = (int)state.rlSeqNo;
                     Crter = state.Crter;
                     LstUpdter = state.LstUpdter;
-                    log.Info("begin");
-                    //Insert into AttrPass
+
+                    //Insert into AttrPass detail
                     if (state.InsertDetails != null)
                     {
                         foreach (var insertState in state.InsertDetails)
                         {
-                            sql = $"INSERT INTO ATTRPASS (TmpId,CTmpId,CAttrId,CAttrValue,ValueTp,PAttrId,Eq,Excld, Gt,Gteq,Lt,Lteq, rlSeqNo,CrtDate,Crter) values ({TmpId},{CTmpId},'{insertState.CAttrId}','{insertState.CAttrValue}','{insertState.ValueTp}','{insertState.PAttrId}','{insertState.Eq}','{insertState.Excld}','{insertState.Gt}','{insertState.Gteq}','{insertState.Lt}','{insertState.Lteq}',{rlSeqNo},'{DateTime.Now}','{Crter}')";
+                            sql = $"INSERT INTO ATTRPASS (TmpId,CTmpId,CAttrId,CAttrValue,ValueTp,PAttrId,Eq,Excld, Gt,Gteq,Lt,Lteq, rlSeqNo,CrtDate,Crter) values ('{TmpId}','{CTmpId}','{insertState.CAttrId}','{insertState.CAttrValue}','{insertState.ValueTp}','{insertState.PAttrId}','{insertState.Eq}','{insertState.Excld}','{insertState.Gt}','{insertState.Gteq}','{insertState.Lt}','{insertState.Lteq}',{rlSeqNo},'{DateTime.Now}','{Crter}')";
                             command.CommandText = sql;
-                            log.Info(sql);
                             try
                             {
                                 result = command.ExecuteNonQuery();
                             }
                             catch (Exception e)
                             {
-                                log.Error(string.Format($"Insert into attrpass error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                                log.Error(string.Format($"Insert into attrpass error!\nsql[{sql}]\nErrMsg[{e.Message}]\nError[{e.StackTrace}]"));
                                 sqlTransaction.Rollback();
                                 DBConnection.CloseConnection(sqlConnection);
                                 throw;
@@ -81,21 +80,21 @@ namespace BOM.Models
                             //OrigGteq
                             if (updateDetail.OrigGteq != "1")
                             {
-                                condition.Append(" Gteq != '1' ");
+                                condition.Append(" Gteq != '1' ");//表示父属性的值大于"Gt"字段中的值
                             }
                             else
                             {
-                                condition.Append(" Gteq = '1' ");
+                                condition.Append(" Gteq = '1' ");//表示父属性的值大于等于"Gt"字段中的值
                             }
 
                             //OrigLteq
                             if (updateDetail.OrigLteq != "1")
                             {
-                                condition.Append("AND Lteq != '1' ");
+                                condition.Append("AND Lteq != '1' ");//表示父属性的值小于"Lt"字段中的值
                             }
                             else
                             {
-                                condition.Append("AND Lteq = '1' ");
+                                condition.Append("AND Lteq = '1' ");//表示父属性的值小于等于"Lt"字段中的值
                             }
 
                             //OrigEq
@@ -147,8 +146,7 @@ namespace BOM.Models
                             {
                                 condition.Append($"AND PAttrId = '{updateDetail.OrigPAttrId}'");
                             }
-                            sql = $"UPDATE ATTRPASS SET Eq = '{updateDetail.Eq}', Excld = '{updateDetail.Excld}', Gt = '{updateDetail.Gt}', Gteq = '{updateDetail.Gteq}', Lt = '{updateDetail.Lt}', Lteq = '{updateDetail.Lteq}', LstUpdtDate = '{DateTime.Now}', LstUpdter = '{LstUpdter}' WHERE TmpId = {TmpId} and CTmpId = {CTmpId} and rlSeqNo = {rlSeqNo} and CAttrId = '{updateDetail.OrigCAttrId}' and CAttrValue = '{updateDetail.OrigCAttrValue}' and ValueTp = '{updateDetail.OrigValueTp}' and " + condition.ToString();
-                            log.Info(sql);
+                            sql = $"UPDATE ATTRPASS SET Eq = '{updateDetail.Eq}', Excld = '{updateDetail.Excld}', Gt = '{updateDetail.Gt}', Gteq = '{updateDetail.Gteq}', Lt = '{updateDetail.Lt}', Lteq = '{updateDetail.Lteq}', LstUpdtDate = '{DateTime.Now}', LstUpdter = '{LstUpdter}' WHERE TmpId = '{TmpId}' and CTmpId = '{CTmpId}' and rlSeqNo = {rlSeqNo} and CAttrId = '{updateDetail.OrigCAttrId}' and CAttrValue = '{updateDetail.OrigCAttrValue}' and ValueTp = '{updateDetail.OrigValueTp}' and " + condition.ToString();
                             command.CommandText = sql;
                             try
                             {
@@ -156,7 +154,7 @@ namespace BOM.Models
                             }
                             catch (Exception e)
                             {
-                                log.Error(string.Format($"Update attrpass error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                                log.Error(string.Format($"Update attrpass error!\nsql[{sql}]\nErrMsg[{e.Message}]Error[{e.StackTrace}]"));
                                 sqlTransaction.Rollback();
                                 DBConnection.CloseConnection(sqlConnection);
                                 throw;
@@ -249,7 +247,7 @@ namespace BOM.Models
                                 condition.Append($"AND PAttrId = '{deleteDetail.OrigPAttrId}'");
                             }
 
-                            sql = $"DELETE FROM ATTRPASS WHERE TmpId = {TmpId} and CTmpId = {CTmpId} and rlSeqNo = {rlSeqNo} and CAttrId = '{deleteDetail.OrigCAttrId}' and CAttrValue = '{deleteDetail.OrigCAttrValue}' and ValueTp = '{deleteDetail.OrigValueTp}' and " + condition.ToString();
+                            sql = $"DELETE FROM ATTRPASS WHERE TmpId = '{TmpId}' and CTmpId = '{CTmpId}' and rlSeqNo = {rlSeqNo} and CAttrId = '{deleteDetail.OrigCAttrId}' and CAttrValue = '{deleteDetail.OrigCAttrValue}' and ValueTp = '{deleteDetail.OrigValueTp}' and " + condition.ToString();
                             log.Info(sql);
                             command.CommandText = sql;
                             try
@@ -258,7 +256,7 @@ namespace BOM.Models
                             }
                             catch (Exception e)
                             {
-                                log.Error(string.Format($"Delete from attrpass error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                                log.Error(string.Format($"Delete from attrpass error!\nsql[{sql}]\nErrMsg[{e.Message}]Error[{e.StackTrace}]"));
                                 sqlTransaction.Rollback();
                                 DBConnection.CloseConnection(sqlConnection);
                                 throw;
@@ -279,9 +277,8 @@ namespace BOM.Models
                     {
                         foreach (var updateSum in state.UpdateSums)
                         {
-                            sql = $"UPDATE ATTRPASS SET CAttrValue = '{updateSum.CAttrValue}', ValueTp = '{updateSum.ValueTp}', LstUpdtDate = '{DateTime.Now}', LstUpdter = '{LstUpdter}' WHERE TmpId = {TmpId} and CTmpId = {CTmpId} and rlSeqNo = {rlSeqNo} and CAttrId = '{updateSum.OrigCAttrId}' and CAttrValue = '{updateSum.OrigCAttrValue}' and ValueTp = '{updateSum.OrigValueTp}'";
+                            sql = $"UPDATE ATTRPASS SET CAttrValue = '{updateSum.CAttrValue}', ValueTp = '{updateSum.ValueTp}', LstUpdtDate = '{DateTime.Now}', LstUpdter = '{LstUpdter}' WHERE TmpId = '{TmpId}' and CTmpId = '{CTmpId}' and rlSeqNo = {rlSeqNo} and CAttrId = '{updateSum.OrigCAttrId}' and CAttrValue = '{updateSum.OrigCAttrValue}' and ValueTp = '{updateSum.OrigValueTp}'";
 
-                            log.Info(sql);
                             command.CommandText = sql;
                             try
                             {
@@ -289,7 +286,7 @@ namespace BOM.Models
                             }
                             catch (Exception e)
                             {
-                                log.Error(string.Format($"Update attrpass sum error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                                log.Error(string.Format($"Update attrpass sum error!\nsql[{sql}]\nErrMsg[{e.Message}]\nError[{e.StackTrace}]"));
                                 sqlTransaction.Rollback();
                                 DBConnection.CloseConnection(sqlConnection);
                                 throw;
@@ -310,8 +307,7 @@ namespace BOM.Models
                     {
                         foreach (var deleteSum in state.DeleteSums)
                         {
-                            sql = $"DELETE FROM ATTRPASS WHERE TmpId = {TmpId} and CTmpId = {CTmpId} and rlSeqNo = {rlSeqNo} and CAttrId = '{deleteSum.OrigCAttrId}' and CAttrValue = '{deleteSum.OrigCAttrValue}' and ValueTp = '{deleteSum.OrigValueTp}'";
-                            log.Info(sql);
+                            sql = $"DELETE FROM ATTRPASS WHERE TmpId = '{TmpId}' and CTmpId = '{CTmpId}' and rlSeqNo = {rlSeqNo} and CAttrId = '{deleteSum.OrigCAttrId}' and CAttrValue = '{deleteSum.OrigCAttrValue}' and ValueTp = '{deleteSum.OrigValueTp}'";
                             command.CommandText = sql;
                             try
                             {
@@ -319,7 +315,7 @@ namespace BOM.Models
                             }
                             catch (Exception e)
                             {
-                                log.Error(string.Format($"Delete attrpass sum error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                                log.Error(string.Format($"Delete attrpass sum error!\nsql[{sql}]\nErrMsg[{e.Message}]\nError[{e.StackTrace}]"));
                                 sqlTransaction.Rollback();
                                 DBConnection.CloseConnection(sqlConnection);
                                 throw;
@@ -343,11 +339,11 @@ namespace BOM.Models
                             bool newFlag = (updateDefault.NewFlag == "1");
                             if (newFlag)
                             {
-                                sql = $"INSERT INTO ATTRPASS (Ctmpid,rlseqno,tmpid,cattrid,cattrvalue,valuetp,pattrid) values ({CTmpId},{rlSeqNo},{TmpId},'{updateDefault.CAttrId}','{updateDefault.CAttrValue}',0,0)";
+                                sql = $"INSERT INTO ATTRPASS (Ctmpid,rlseqno,tmpid,cattrid,cattrvalue,valuetp,pattrid,CrtDate,Crter) values ('{CTmpId}',{rlSeqNo},'{TmpId}','{updateDefault.CAttrId}','{updateDefault.CAttrValue}',0,0,'{DateTime.Now}','{Crter}')";
                             }
                             else
                             {
-                                sql = $"UPDATE ATTRPASS SET CAttrValue = '{updateDefault.CAttrValue}',LstUpdtDate = '{DateTime.Now}', LstUpdter = '{LstUpdter}' WHERE CTmpId = {CTmpId} AND rlSeqNo='{rlSeqNo}' AND TmpId = {TmpId} AND CAttrId = '{updateDefault.CAttrId}' AND ValueTp = '0'";
+                                sql = $"UPDATE ATTRPASS SET CAttrValue = '{updateDefault.CAttrValue}',LstUpdtDate = '{DateTime.Now}', LstUpdter = '{LstUpdter}' WHERE CTmpId = '{CTmpId}' AND rlSeqNo='{rlSeqNo}' AND TmpId = '{TmpId}' AND CAttrId = '{updateDefault.CAttrId}' AND ValueTp = '0'";
                             }
 
                             command.CommandText = sql;
@@ -358,7 +354,7 @@ namespace BOM.Models
                             }
                             catch (Exception e)
                             {
-                                log.Error(string.Format(newFlag ? "Insert" : "Update" + $" attrpass default error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                                log.Error(string.Format(newFlag ? "Insert" : "Update" + $" attrpass default error!\nsql[{sql}]\nErrMsg[{e.Message}]\nError[{e.StackTrace}]"));
                                 sqlTransaction.Rollback();
                                 DBConnection.CloseConnection(sqlConnection);
                                 throw;
@@ -381,8 +377,8 @@ namespace BOM.Models
 
         public class RelationMaintain
         {
-            public long TmpId { get; set; }
-            public long CTmpId { get; set; }
+            public string TmpId { get; set; }
+            public string CTmpId { get; set; }
             public int rlSeqNo { get; set; }
             public string Crter { get; set; }
             public string LstUpdter { get; set; }

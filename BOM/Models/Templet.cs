@@ -525,10 +525,5 @@ namespace BOM.Models
             }
             DBConnection.CloseConnection(sqlConnection);
         }
-
-        public void BatchProcess()
-        {
-
-        }
     }
 }

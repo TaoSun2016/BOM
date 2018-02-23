@@ -18,7 +18,6 @@ namespace BOM.Models
             SqlTransaction sqlTransaction = sqlConnection.BeginTransaction();
             string sql = @"SELECT * FROM SEQ_NO WHERE Ind_Key = '0'";
 
-
             using (SqlCommand command = new SqlCommand(sql, sqlConnection))
             {
 

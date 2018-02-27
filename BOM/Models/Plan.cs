@@ -7,7 +7,7 @@ using System.Web;
 
 namespace BOM.Models
 {
-    public class Plan:IDisposable
+    public class Plan : IDisposable
     {
         log4net.ILog log = log4net.LogManager.GetLogger("Plan");
         private SqlConnection connection = null;
@@ -50,8 +50,9 @@ namespace BOM.Models
                     {
                         while (dataReader.Read())
                         {
-                            listJH.Add(new ShengChJH() {
-                                wuLBM =(long)dataReader["wuLBM"],
+                            listJH.Add(new ShengChJH()
+                            {
+                                wuLBM = (long)dataReader["wuLBM"],
                                 gongZLH = dataReader["gongZLH"].ToString(),
                                 qiH = dataReader["qiH"].ToString(),
                                 xuH = (int)dataReader["xuH"]
@@ -89,20 +90,54 @@ namespace BOM.Models
         /// </summary>
         private void Calculate(int Option, long wuLBM, decimal shuL, string gongZLH, string qiH, int xuH)
         {
-            
-            decimal GR = shuL;  //毛需求量 GR 由前台上宋
-            decimal POH = 0m;    //预计在库量
-            decimal SOR = 0m;    //在途数量
-            decimal OH = 0m;     //在库数量
-            decimal PAB = 0m;    //上期库存数量
+
+            decimal GR = shuL;      //毛需求量 GR 由前台上宋
+            decimal POH = 0.0000m;       //预计在库量
+            decimal SOR = 0.0000m;       //在途数量
+            decimal OH = 0.0000m;        //在库数量
+            decimal PAB = 0.0000m;       //上期库存数量
+            decimal SS = 0.0000m;        //安全库存
+            decimal NR = 0.0000m;        //净需求数量NR
+            decimal LS = 0.0000m;        //批量规则
+            decimal PORC = 0.0000m;      //计算计划订单收料量PORC
 
             string sql = null;
             SqlDataReader dataReader = null;
 
+            //获取DeafaultAttr表中当前物料的参数
+            using (SqlCommand cmd = new SqlCommand())
+            {
+                cmd.Connection = connection;
+                sql = $"select * from DeafaultAttr where materielIdentfication = {wuLBM}";
+                cmd.CommandText = sql;
+                try
+                {
+                    dataReader = cmd.ExecuteReader();
+                    if (dataReader.HasRows)
+                    {
+                        dataReader.Read();
+                        SOR = Convert.ToDecimal(dataReader["SR"].ToString());       //在途数量
+                        PAB = Convert.ToDecimal(dataReader["_STORE_"].ToString());  //上期库存数量
+                        SS = Convert.ToDecimal(dataReader["SS"].ToString());        //安全库存
+                        LS = Convert.ToDecimal(dataReader["LS"].ToString());        //批量规则
 
-
-
-
+                    }
+                    else
+                    {
+                        log.Error(string.Format($"Select DeafaultAttr error!\nsql[{sql}]\nError"));
+                        throw new Exception("No data found!");
+                    }
+                }
+                catch (Exception e)
+                {
+                    log.Error(string.Format($"Select DeafaultAttr error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                    throw;
+                }
+                finally
+                {
+                    dataReader.Close();
+                }
+            }
 
             //预计在库量 POH
             if (Option == 1 || Option == 3)//重拍，预重拍
@@ -111,33 +146,6 @@ namespace BOM.Models
                 using (SqlCommand cmd = new SqlCommand())
                 {
                     cmd.Connection = connection;
-                    sql = $"select SR from DeafaultAttr where materielIdentfication = {wuLBM}";
-                    cmd.CommandText = sql;
-                    try
-                    {
-                        dataReader = cmd.ExecuteReader();
-                        if (dataReader.HasRows)
-                        {
-                            dataReader.Read();
-                            SOR = Convert.ToDecimal(dataReader["SR"].ToString());
-
-                        }
-                        else
-                        {
-                            log.Error(string.Format($"Select SR from DeafaultAttr error!\nsql[{sql}]\nError"));
-                            throw new Exception("No data found!");
-                        }
-                    }
-                    catch (Exception e)
-                    {
-                        log.Error(string.Format($"Get SOR error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                        throw;
-                    }
-                    finally
-                    {
-                        dataReader.Close();
-                    }
-
                     //获取在库数量OH
                     sql = $"select sum(kuCSh) from kuCShJB001 where wuLBM = {wuLBM}";
                     cmd.CommandText = sql;
@@ -157,42 +165,29 @@ namespace BOM.Models
             }
             else//续拍
             {
-                //获取上期库存数量
-                using (SqlCommand cmd = new SqlCommand())
-                {
-                    cmd.Connection = connection;
-                    sql = $"select _store_ from DeafaultAttr where materielIdentfication = {wuLBM}";
-                    cmd.CommandText = sql;
-                    try
-                    {
-                        dataReader = cmd.ExecuteReader();
-                        if (dataReader.HasRows)
-                        {
-                            dataReader.Read();
-                            PAB = Convert.ToDecimal(dataReader["_STORE_"].ToString());
-
-                        }
-                        else
-                        {
-                            log.Error(string.Format($"Select _store_ from DeafaultAttr error!\nsql[{sql}]\nError"));
-                            throw new Exception("No data found!");
-                        }
-                    }
-                    catch (Exception e)
-                    {
-                        log.Error(string.Format($"Get PAB error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                        throw;
-                    }
-                    finally
-                    {
-                        dataReader.Close();
-                    }
-
-                }
                 //预计在库数量POH=上期期末可用库存数量PAB-毛需求量GR
-                POH = SOR + OH - GR;
+                POH = PAB - GR;
             }
+
             //计算净需求数量NR
+            if (POH - SS >= 0.00005m)
+            {
+                NR = 0.0000m;
+            }
+            else
+            {
+                NR = SS - POH;
+            }
+
+            //计算计划订单收料量PORC
+            PORC = 0.0000m;
+            if (NR > 0.00005m)
+            {
+                do
+                {
+                    PORC += LS;
+                } while (PORC - NR < -0.00005m);
+            }
         }
 
 

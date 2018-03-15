@@ -11,7 +11,7 @@ namespace BOM.Models
     {
         log4net.ILog log = log4net.LogManager.GetLogger("Plan");
         private SqlConnection connection = null;
-
+        List<Stock> stocks = new List<Stock>();
         public Plan()
         {
             connection = DBConnection.OpenConnection();
@@ -22,73 +22,50 @@ namespace BOM.Models
         /// <summary>
         /// 排产
         /// </summary>
-        /// <param name="Option">造作选项：1重拍2续排3预重拍4预续排</param>
-        /// <param name="wuLBM">物料编码</param>
-        /// <param name="shuL">物料数量</param>
-        /// <param name="gongZLH">工作令号</param>
-        /// <param name="qiH">期号</param>
-        /// <param name="xuH">序号</param>
-        public void ProductionPlan(int Option, long wuLBM, decimal shuL, string gongZLH, string qiH, int xuH)
+        public void ProductionPlan(int option, List<PlanItem> requestItems)
         {
             string sql = null;
 
             List<ShengChJH> listJH = new List<ShengChJH>();
+            List<PlanItem> items = requestItems.OrderBy(m => m.qiH).ThenBy(m => m.xuH).ThenBy(m => m.gongZLH).ToList();
 
-            //查询生产计划表
-            using (SqlCommand command = new SqlCommand())
-            {
-                command.Connection = connection;
-                SqlDataReader dataReader = null;
-
-                sql = $"SELECT * FROM shengChJH WHERE wuLBM = '{wuLBM}' and gongZLH = '{gongZLH}' and qiH = '{qiH}' and xuH = '{xuH}' order by gongZLH, qiH, xuH, wuLBM";
-                command.CommandText = sql;
-
-                try
-                {
-                    dataReader = command.ExecuteReader();
-                    if (dataReader.HasRows)
-                    {
-                        while (dataReader.Read())
-                        {
-                            listJH.Add(new ShengChJH()
-                            {
-                                wuLBM = (long)dataReader["wuLBM"],
-                                gongZLH = dataReader["gongZLH"].ToString(),
-                                qiH = dataReader["qiH"].ToString(),
-                                xuH = (int)dataReader["xuH"]
-                            });
-                        }
-
-                    }
-                    else
-                    {
-                        log.Error(string.Format($"Select shengChJH error!\nsql[{sql}]\nError"));
-                        throw new Exception("No data found!");
-                    }
-                }
-                catch (Exception e)
-                {
-                    log.Error(string.Format($"Select shengChJH error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                    throw;
-                }
-                finally
-                {
-                    dataReader.Close();
-                }
-
-            }
+            //初始化库存数据
+            InitData(option);
 
             //遍历生产计划记录
-            foreach (ShengChJH jh in listJH)
+            foreach (PlanItem item in items)
             {
-                Calculate(Option, jh.wuLBM, shuL, jh.gongZLH, jh.qiH, jh.xuH);
+                Calculate(option, item);
             }
+
+            //更新上期库存量
+            UpdatePAB();
+        }
+
+        private int InitData(int option)
+        {
+            string sql = null;
+            SqlDataReader dataReader = null;
+
+            if ( option == 1 || option == 3)//重排，预重排
+            {
+
+            }
+            else if(option == 2 || option == 4)//续拍，预续排
+            {
+
+            }
+            else
+            {
+                return -1;
+            }
+            return 0;
         }
 
         /// <summary>
         /// 计算单个物料的缺件信息和相关表单数据
         /// </summary>
-        private void Calculate(int Option, long wuLBM, decimal shuL, string gongZLH, string qiH, int xuH)
+        private void Calculate(int option, PlanItem item)
         {
 
             decimal GR = shuL;      //毛需求量 GR 由前台上宋
@@ -336,4 +313,25 @@ namespace BOM.Models
         public string beiZh { get; set; }//备注
         public int heTTZhDCBBSh { get; set; }//合同通知单从表标识
     }
+
+
+    public class PlanItem
+    {
+        public long wuLBM;         //物料编码
+        public decimal shuL;       //数量
+        public string gongZLH;     //工作令号
+        public string qiH;         //期号
+        public int xuH;            //序号
+        public DateTime jiaoHQ;    //交货期
+    }
+
+    public class Stock
+    {
+        public long wuLBM;         //物料编码
+        public decimal SOR;        //在途数量
+        public decimal HO;         //在库数量
+        public decimal POH;        //预计在库量
+        public decimal PAB;        //上期可用库存量
+    }
+
 }

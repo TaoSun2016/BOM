@@ -11,6 +11,7 @@ namespace BOM.Models
     {
         log4net.ILog log = log4net.LogManager.GetLogger("Plan");
         private SqlConnection connection = null;
+        string sql = null;
         List<Stock> stocks = new List<Stock>();
         public Plan()
         {
@@ -24,13 +25,18 @@ namespace BOM.Models
         /// </summary>
         public void ProductionPlan(int option, List<PlanItem> requestItems)
         {
-            string sql = null;
+
 
             List<ShengChJH> listJH = new List<ShengChJH>();
             List<PlanItem> items = requestItems.OrderBy(m => m.qiH).ThenBy(m => m.xuH).ThenBy(m => m.gongZLH).ToList();
 
             //初始化库存数据
-            InitData(option);
+            if (!InitData(option))
+            {
+                log.Error(string.Format($"Init Data Fail!\n"));
+                return;
+
+            }
 
             //遍历生产计划记录
             foreach (PlanItem item in items)
@@ -42,209 +48,262 @@ namespace BOM.Models
             UpdatePAB();
         }
 
-        private int InitData(int option)
+        private bool InitData(int option)
         {
-            string sql = null;
             SqlDataReader dataReader = null;
 
-            if ( option == 1 || option == 3)//重排，预重排
-            {
 
-            }
-            else if(option == 2 || option == 4)//续拍，预续排
-            {
-
-            }
-            else
-            {
-                return -1;
-            }
-            return 0;
-        }
-
-        /// <summary>
-        /// 计算单个物料的缺件信息和相关表单数据
-        /// </summary>
-        private void Calculate(int option, PlanItem item)
-        {
-
-            decimal GR = shuL;      //毛需求量 GR 由前台上宋
-            decimal POH = 0.0000m;       //预计在库量
-            decimal SOR = 0.0000m;       //在途数量
-            decimal OH = 0.0000m;        //在库数量
-            decimal PAB = 0.0000m;       //上期库存数量
-            decimal SS = 0.0000m;        //安全库存
-            decimal NR = 0.0000m;        //净需求数量NR
-            decimal LS = 0.0000m;        //批量规则
-            decimal PORC = 0.0000m;      //计算计划订单收料量PORC
-            string SHENGCLX = null;     //生产类型 0原材料,1自制件,2外协,3半成品，4成品
-
-            string sql = null;
-            SqlDataReader dataReader = null;
+            stocks.Clear();
 
             //获取DeafaultAttr表中当前物料的参数
-            using (SqlCommand cmd = new SqlCommand())
+            using (SqlCommand cmd = new SqlCommand(), cmd1 = new SqlCommand())
             {
                 cmd.Connection = connection;
-                sql = $"select * from DeafaultAttr where materielIdentfication = {wuLBM}";
+                sql = $"select * from DeafaultAttr";
                 cmd.CommandText = sql;
                 try
                 {
                     dataReader = cmd.ExecuteReader();
                     if (dataReader.HasRows)
                     {
-                        dataReader.Read();
-                        SOR = Convert.ToDecimal(dataReader["SR"].ToString());       //在途数量
-                        PAB = Convert.ToDecimal(dataReader["_STORE_"].ToString());  //上期库存数量
-                        SS = Convert.ToDecimal(dataReader["SS"].ToString());        //安全库存
-                        LS = Convert.ToDecimal(dataReader["LS"].ToString());        //批量规则
-                        SHENGCLX = dataReader["SHENGCLX"].ToString();        //批量规则
+                        while (dataReader.Read())
+                        {
+                            var item = new Stock();
+                            item.flag = 0;
+                            item.wuLBM = Convert.ToInt64(dataReader["materielIdentfication"].ToString());//物料编码
+                            item.SOR = Convert.ToDecimal(dataReader["SR"].ToString());       //在途数量
+                            item.PAB = Convert.ToDecimal(dataReader["_STORE_"].ToString());  //上期库存数量
 
+                            item.OH = 0.00m;                                                //获取在库数量OH
+
+                            sql = $"select sum(kuCSh) from kuCShJB001 where wuLBM = {item.wuLBM}";
+                            cmd1.CommandText = sql;
+                            try
+                            {
+                                item.OH = Convert.ToDecimal(cmd.ExecuteScalar());
+                            }
+                            catch (Exception e)
+                            {
+                                log.Error(string.Format($"Get OH error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                                return false;
+                            }
+
+                            if (option == 1 || option == 3)//重排，预重排
+                            {
+
+                                item.PAB = 0.00m;
+                            }
+                            stocks.Add(item);
+                        }
                     }
                     else
                     {
                         log.Error(string.Format($"Select DeafaultAttr error!\nsql[{sql}]\nError"));
-                        throw new Exception("No data found!");
+                        return false;
                     }
                 }
                 catch (Exception e)
                 {
                     log.Error(string.Format($"Select DeafaultAttr error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                    throw;
+                    return false;
                 }
                 finally
                 {
                     dataReader.Close();
                 }
 
+                return true;
+            }
 
-                //预计在库量 POH
-                if (Option == 1 || Option == 3)//重拍，预重拍
+            /// <summary>
+            /// 计算单个物料的缺件信息和相关表单数据
+            /// </summary>
+            private void Calculate(int option, PlanItem item)
+            {
+
+                decimal GR = shuL;      //毛需求量 GR 由前台上宋
+                decimal POH = 0.0000m;       //预计在库量
+                decimal SOR = 0.0000m;       //在途数量
+                decimal OH = 0.0000m;        //在库数量
+                decimal PAB = 0.0000m;       //上期库存数量
+                decimal SS = 0.0000m;        //安全库存
+                decimal NR = 0.0000m;        //净需求数量NR
+                decimal LS = 0.0000m;        //批量规则
+                decimal PORC = 0.0000m;      //计算计划订单收料量PORC
+                string SHENGCLX = null;     //生产类型 0原材料,1自制件,2外协,3半成品，4成品
+
+                string sql = null;
+                SqlDataReader dataReader = null;
+
+                //获取DeafaultAttr表中当前物料的参数
+                using (SqlCommand cmd = new SqlCommand())
                 {
-
-                    //获取在库数量OH
-                    sql = $"select sum(kuCSh) from kuCShJB001 where wuLBM = {wuLBM}";
+                    cmd.Connection = connection;
+                    sql = $"select * from DeafaultAttr where materielIdentfication = {wuLBM}";
                     cmd.CommandText = sql;
                     try
                     {
-                        OH = Convert.ToDecimal(cmd.ExecuteScalar());
+                        dataReader = cmd.ExecuteReader();
+                        if (dataReader.HasRows)
+                        {
+                            dataReader.Read();
+                            SOR = Convert.ToDecimal(dataReader["SR"].ToString());       //在途数量
+                            PAB = Convert.ToDecimal(dataReader["_STORE_"].ToString());  //上期库存数量
+                            SS = Convert.ToDecimal(dataReader["SS"].ToString());        //安全库存
+                            LS = Convert.ToDecimal(dataReader["LS"].ToString());        //批量规则
+                            SHENGCLX = dataReader["SHENGCLX"].ToString();        //批量规则
+
+                        }
+                        else
+                        {
+                            log.Error(string.Format($"Select DeafaultAttr error!\nsql[{sql}]\nError"));
+                            throw new Exception("No data found!");
+                        }
                     }
                     catch (Exception e)
                     {
-                        log.Error(string.Format($"Get OH error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                        log.Error(string.Format($"Select DeafaultAttr error!\nsql[{sql}]\nError[{e.StackTrace}]"));
                         throw;
+                    }
+                    finally
+                    {
+                        dataReader.Close();
                     }
 
 
-                    //预计在库数量POH = 在途数量SOR + 在库数量OH - 毛需求量GR
-                    POH = SOR + OH - GR;
-                }
-                else//续拍
-                {
-                    //预计在库数量POH=上期期末可用库存数量PAB-毛需求量GR
-                    POH = PAB - GR;
-                }
-
-                //计算净需求数量NR
-                if (POH - SS >= 0.00005m)
-                {
-                    NR = 0.0000m;
-                }
-                else
-                {
-                    NR = SS - POH;
-                }
-
-                //计算计划订单收料量PORC,即为缺件数量
-                PORC = 0.0000m;
-                if (NR > 0.00005m)
-                {
-                    do
+                    //预计在库量 POH
+                    if (Option == 1 || Option == 3)//重拍，预重拍
                     {
-                        PORC += LS;
-                    } while (PORC - NR < -0.00005m);
+
+                        //获取在库数量OH
+                        sql = $"select sum(kuCSh) from kuCShJB001 where wuLBM = {wuLBM}";
+                        cmd.CommandText = sql;
+                        try
+                        {
+                            OH = Convert.ToDecimal(cmd.ExecuteScalar());
+                        }
+                        catch (Exception e)
+                        {
+                            log.Error(string.Format($"Get OH error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                            throw;
+                        }
+
+
+                        //预计在库数量POH = 在途数量SOR + 在库数量OH - 毛需求量GR
+                        POH = SOR + OH - GR;
+                    }
+                    else//续拍
+                    {
+                        //预计在库数量POH=上期期末可用库存数量PAB-毛需求量GR
+                        POH = PAB - GR;
+                    }
+
+                    //计算净需求数量NR
+                    if (POH - SS >= 0.00005m)
+                    {
+                        NR = 0.0000m;
+                    }
+                    else
+                    {
+                        NR = SS - POH;
+                    }
+
+                    //计算计划订单收料量PORC,即为缺件数量
+                    PORC = 0.0000m;
+                    if (NR > 0.00005m)
+                    {
+                        do
+                        {
+                            PORC += LS;
+                        } while (PORC - NR < -0.00005m);
+                    }
+
+                    //登记缺件表
+                    sql = $"insert into ullageTempSingle values ";
+
+                    //计算本期库存数量PAB = 计划订单收料量PORC + 预计在库量POH
+                    PAB = PORC + POH;
+                    //考虑更新PAB??   中间结果存内存，最终的值存在DeafaultAttr的store字段
+                    //todo
+
+                    //根据生产类型登记数据库表
+                    switch (SHENGCLX)
+                    {
+                        case "0"://0原材料
+                            break;
+                        case "1"://1自制件
+                            break;
+                        case "2"://2外协
+                            break;
+                        case "3"://3半成品
+                            break;
+                        case "4"://4成品
+                            break;
+                        default:
+                            break;
+                    }
+
+
+
+
+
                 }
-
-                //登记缺件表
-                sql = $"insert into ullageTempSingle values ";
-
-                //计算本期库存数量PAB = 计划订单收料量PORC + 预计在库量POH
-                PAB = PORC + POH;
-                //考虑更新PAB??   中间结果存内存，最终的值存在DeafaultAttr的store字段
-                //todo
-
-                //根据生产类型登记数据库表
-                switch (SHENGCLX)
-                {
-                    case "0"://0原材料
-                        break;
-                    case "1"://1自制件
-                        break;
-                    case "2"://2外协
-                        break;
-                    case "3"://3半成品
-                        break;
-                    case "4"://4成品
-                        break;
-                    default:
-                        break;
-                }
-
-
-
-
 
             }
 
-        }
+            //处理原材料
+            private bool Process_0(SqlCommand cmd)
+            {
+                // update DeafaultAttr set _store_ = PAB
+                // update caiGShJB001 采购数据表
+                return true;
+            }
 
-        //处理原材料
-        private bool Process_0(SqlCommand cmd)
-        {
-            // update DeafaultAttr set _store_ = PAB
-            // update caiGShJB001 采购数据表
-            return true;
-        }
+            //处理自制件
+            private bool Process_1(SqlCommand cmd)
+            {
+                // update DeafaultAttr set _store_ = PAB
+                // delete gongXZhYZhBDZhB    工序转移准备单主表 应该只删除本令号本期号的吧？？？
+                // insert gongXZhYZhBDZhB   根据期号和物料编码的姓编码，编成一个单据主表
+                //delete gongXZhYZhBDCB     工序转移准备单从表 应该只删除本令号本期号的吧？？？
+                // insert gongXZhYZhBDCB 令号+顺序号+物料编码+名称+规格+图号+计划数量  其它不用处理
+                // 更新投料采购下达， update touLCGXD
+                return true;
+            }
 
-        //处理自制件
-        private bool Process_1(SqlCommand cmd)
-        {
-            // update DeafaultAttr set _store_ = PAB
-            // delete gongXZhYZhBDZhB    工序转移准备单主表 应该只删除本令号本期号的吧？？？
-            // insert gongXZhYZhBDZhB   根据期号和物料编码的姓编码，编成一个单据主表
-            //delete gongXZhYZhBDCB     工序转移准备单从表 应该只删除本令号本期号的吧？？？
-            // insert gongXZhYZhBDCB 令号+顺序号+物料编码+名称+规格+图号+计划数量  其它不用处理
-            // 更新投料采购下达， update touLCGXD
-            return true;
-        }
+            //外协
+            private bool Process_2(SqlCommand cmd)
+            {
+                // update DeafaultAttr set _store_ = PAB
+                //清空更新[dbo].[外协出库准备单主表]，[dbo].[外协出库准备单从表]
+                return true;
+            }
 
-        //外协
-        private bool Process_2(SqlCommand cmd)
-        {
-            // update DeafaultAttr set _store_ = PAB
-            //清空更新[dbo].[外协出库准备单主表]，[dbo].[外协出库准备单从表]
-            return true;
-        }
+            //半成品
+            private bool Process_3(SqlCommand cmd)
+            {
+                // update DeafaultAttr set _store_ = PAB
 
-        //半成品
-        private bool Process_3(SqlCommand cmd)
-        {
-            // update DeafaultAttr set _store_ = PAB
+                // delete gongXZhYZhBDZhB    工序转移准备单主表 应该只删除本令号本期号的吧？？？
+                // insert gongXZhYZhBDZhB   根据期号和物料编码的姓编码，编成一个单据主表
+                //delete gongXZhYZhBDCB     工序转移准备单从表 应该只删除本令号本期号的吧？？？
+                // insert gongXZhYZhBDCB 令号+顺序号+物料编码+名称+规格+图号+计划数量  其它不用处理
 
-            // delete gongXZhYZhBDZhB    工序转移准备单主表 应该只删除本令号本期号的吧？？？
-            // insert gongXZhYZhBDZhB   根据期号和物料编码的姓编码，编成一个单据主表
-            //delete gongXZhYZhBDCB     工序转移准备单从表 应该只删除本令号本期号的吧？？？
-            // insert gongXZhYZhBDCB 令号+顺序号+物料编码+名称+规格+图号+计划数量  其它不用处理
-            
-            return true;
-        }
+                return true;
+            }
 
-        //成品
-        private bool Process_4(SqlCommand cmd)
-        {
-            //清空更新[dbo].[成品入库准备单主表]，[dbo].[成品入库准备单从表]
-            return true;
-        }
+            //成品
+            private bool Process_4(SqlCommand cmd)
+            {
+                //清空更新[dbo].[成品入库准备单主表]，[dbo].[成品入库准备单从表]
+                return true;
+            }
+
+            public void UpdatePAB()
+            {
+
+            }
+
 
         #region IDisposable Support
         private bool disposedValue = false; // To detect redundant calls
@@ -329,9 +388,11 @@ namespace BOM.Models
     {
         public long wuLBM;         //物料编码
         public decimal SOR;        //在途数量
-        public decimal HO;         //在库数量
+        public decimal OH;         //在库数量
         public decimal POH;        //预计在库量
         public decimal PAB;        //上期可用库存量
+        public int flag { get; set; }  //1.本次排产用到该无聊 0.没有用到
     }
+
 
 }

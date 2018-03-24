@@ -49,10 +49,11 @@ namespace BOM.Models
             }
 
             //更新上期库存量
-            if (!UpdatePAB(option)）{
+            if (!UpdatePAB(option)){
                 log.Error(string.Format($"Update PAB Failed!\n"));
                 return false;
             }
+            return true;
         }
 
         private bool InitData(int option)
@@ -80,6 +81,9 @@ namespace BOM.Models
                             item.wuLBM = Convert.ToInt64(dataReader["materielIdentfication"].ToString());//物料编码
                             item.SOR = Convert.ToDecimal(dataReader["SR"].ToString());       //在途数量
                             item.PAB = Convert.ToDecimal(dataReader["_STORE_"].ToString());  //上期库存数量
+                            item.SS = Convert.ToDecimal(dataReader["SS"].ToString());        //安全库存
+                            item.LS = Convert.ToDecimal(dataReader["LS"].ToString());        //批量规则
+                            item.shengCLX = dataReader["SHENGCLX"].ToString();              //生产类型
 
                             item.OH = 0.00m;                                                //获取在库数量OH
 
@@ -97,7 +101,6 @@ namespace BOM.Models
 
                             if (option == 1 || option == 3)//重排，预重排
                             {
-
                                 item.PAB = 0.00m;
                             }
                             stocks.Add(item);
@@ -162,10 +165,10 @@ namespace BOM.Models
         /// <summary>
         /// 计算单个物料的缺件信息和相关表单数据
         /// </summary>
-        private void Calculate(int option, PlanItem item)
+        private bool Calculate(int option, PlanItem item)
         {
 
-            decimal GR = shuL;      //毛需求量 GR 由前台上宋
+            decimal GR = shuL;          //毛需求量 GR 由前台上宋
             decimal POH = 0.0000m;       //预计在库量
             decimal SOR = 0.0000m;       //在途数量
             decimal OH = 0.0000m;        //在库数量
@@ -435,8 +438,10 @@ namespace BOM.Models
         public decimal OH;         //在库数量
         public decimal POH;        //预计在库量
         public decimal PAB;        //上期可用库存量
+        public decimal SS { get; set; } //安全库存
+        public decimal LS { get; set; } //批量规则
+        public string shengCLX { get; set; }    //生产类型
         public int flag { get; set; }  //1.本次排产用到该无聊 0.没有用到
     }
-
 
 }

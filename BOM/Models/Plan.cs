@@ -129,6 +129,10 @@ namespace BOM.Models
 
         private bool UpdatePAB(int option)
         {
+            int iterator = 0;
+            StringBuilder sb = new StringBuilder();
+            sb.Clear();
+
             using (SqlCommand cmd = new SqlCommand())
             {
                 cmd.Connection = connection;
@@ -138,24 +142,57 @@ namespace BOM.Models
                     {
                         continue;
                     }
-                    sql = $"UPDATE DeafaultAttr SET _Store_ = {item.PAB} WHERE materielIdentfication = {item.wuLBM}";
-                    cmd.CommandText = sql;
 
+                    iterator++;
+
+                    sb.Append($"UPDATE DeafaultAttr SET _Store_ = {item.PAB} WHERE materielIdentfication = {item.wuLBM} ");
+
+                    if (iterator%1000 == 0)
+                    {
+                        sql = sb.ToString();
+                        cmd.CommandText = sql;
+                        try
+                        {
+                            var result = cmd.ExecuteNonQuery();
+                            if (result != 1)
+                            {
+                                log.Error(string.Format($"Update DeafaultAttr Error!\nsql[{sql}]\n"));
+                                return false;
+                            }
+                        }
+                        catch (Exception e)
+                        {
+                            log.Error(string.Format($"Update DeafaultAttr Error\nsql[{sql}]\nError[{e.StackTrace}]"));
+                            return false;
+                        }
+                        finally
+                        {
+                            sb.Clear();
+                        }
+                    }        
+                }
+                if (sb.Length != 0)
+                {
+                    sql = sb.ToString();
+                    cmd.CommandText = sql;
                     try
                     {
                         var result = cmd.ExecuteNonQuery();
                         if (result != 1)
                         {
-                            log.Error(string.Format($"Select DeafaultAttr error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                            log.Error(string.Format($"Update DeafaultAttr Error!\nsql[{sql}]\n"));
                             return false;
                         }
                     }
-                    catch(Exception e)
+                    catch (Exception e)
                     {
                         log.Error(string.Format($"Update DeafaultAttr Error\nsql[{sql}]\nError[{e.StackTrace}]"));
                         return false;
                     }
-                    
+                    finally
+                    {
+                        sb.Clear();
+                    }
                 }
 
             }

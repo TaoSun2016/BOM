@@ -13,6 +13,7 @@ namespace BOM.Models
         private SqlConnection connection = null;
         string sql = null;
         List<Stock> stocks = new List<Stock>();
+        List<Bom> bomTree = new List<Bom>();
         public Plan()
         {
             connection = DBConnection.OpenConnection();
@@ -49,7 +50,8 @@ namespace BOM.Models
             }
 
             //更新上期库存量
-            if (!UpdatePAB(option)){
+            if (!UpdatePAB(option))
+            {
                 log.Error(string.Format($"Update PAB Failed!\n"));
                 return false;
             }
@@ -65,6 +67,7 @@ namespace BOM.Models
             using (SqlCommand cmd = new SqlCommand(), cmd1 = new SqlCommand())
             {
                 cmd.Connection = connection;
+
                 sql = $"select * from DeafaultAttr";
                 cmd.CommandText = sql;
                 try
@@ -145,7 +148,7 @@ namespace BOM.Models
 
                     sb.Append($"UPDATE DeafaultAttr SET _Store_ = {item.PAB} WHERE materielIdentfication = {item.wuLBM} ");
 
-                    if (iterator%1000 == 0)
+                    if (iterator % 1000 == 0)
                     {
                         sql = sb.ToString();
                         cmd.CommandText = sql;
@@ -167,7 +170,7 @@ namespace BOM.Models
                         {
                             sb.Clear();
                         }
-                    }        
+                    }
                 }
                 if (sb.Length != 0)
                 {
@@ -214,84 +217,171 @@ namespace BOM.Models
             decimal PORC = 0.0000m;      //计算计划订单收料量PORC
             string SHENGCLX = null;     //生产类型 0原材料,1自制件,2外协,3半成品，4成品
 
+            //初始化BOM树
+            if (InitBomTree(item.wuLBM))
+            {
+                log.Error(string.Format($"初始化BOM树失败，BOMID={item.wuLBM}\n"));
+                return false;
+            }
             string sql = null;
             SqlDataReader dataReader = null;
 
             var stock = stocks.Find(m => m.wuLBM == item.wuLBM);
 
 
-                //预计在库量 POH
-                if (Option == 1 || Option == 3)//重拍，预重拍
+            //预计在库量 POH
+            if (Option == 1 || Option == 3)//重拍，预重拍
+            {
+
+                //获取在库数量OH
+                sql = $"select sum(kuCSh) from kuCShJB001 where wuLBM = {wuLBM}";
+                cmd.CommandText = sql;
+                try
                 {
-
-                    //获取在库数量OH
-                    sql = $"select sum(kuCSh) from kuCShJB001 where wuLBM = {wuLBM}";
-                    cmd.CommandText = sql;
-                    try
-                    {
-                        OH = Convert.ToDecimal(cmd.ExecuteScalar());
-                    }
-                    catch (Exception e)
-                    {
-                        log.Error(string.Format($"Get OH error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                        throw;
-                    }
-
-
-                    //预计在库数量POH = 在途数量SOR + 在库数量OH - 毛需求量GR
-                    POH = SOR + OH - GR;
+                    OH = Convert.ToDecimal(cmd.ExecuteScalar());
                 }
-                else//续拍
+                catch (Exception e)
                 {
-                    //预计在库数量POH=上期期末可用库存数量PAB-毛需求量GR
-                    POH = PAB - GR;
+                    log.Error(string.Format($"Get OH error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                    throw;
                 }
 
-                //计算净需求数量NR
-                if (POH - SS >= 0.00005m)
-                {
-                    NR = 0.0000m;
-                }
-                else
-                {
-                    NR = SS - POH;
-                }
 
-                //计算计划订单收料量PORC,即为缺件数量
-                PORC = 0.0000m;
-                if (NR > 0.00005m)
-                {
-                    do
-                    {
-                        PORC += LS;
-                    } while (PORC - NR < -0.00005m);
-                }
-
-                //登记缺件表
-                sql = $"insert into ullageTempSingle values ";
-
-                //计算本期库存数量PAB = 计划订单收料量PORC + 预计在库量POH
-                PAB = PORC + POH;
-                //考虑更新PAB??   中间结果存内存，最终的值存在DeafaultAttr的store字段
-                //todo
-
-                //根据生产类型登记数据库表
-                switch (SHENGCLX)
-                {
-                    case "0"://0原材料
-                        break;
-                    case "1"://1自制件
-                        break;
-                    case "2"://2外协
-                        break;
-                    case "3"://3半成品
-                        break;
-                    case "4"://4成品
-                        break;
-                    default:
-                        break;
-                }
+                //预计在库数量POH = 在途数量SOR + 在库数量OH - 毛需求量GR
+                POH = SOR + OH - GR;
             }
+            else//续拍
+            {
+                //预计在库数量POH=上期期末可用库存数量PAB-毛需求量GR
+                POH = PAB - GR;
+            }
+
+            //计算净需求数量NR
+            if (POH - SS >= 0.00005m)
+            {
+                NR = 0.0000m;
+            }
+            else
+            {
+                NR = SS - POH;
+            }
+
+            //计算计划订单收料量PORC,即为缺件数量
+            PORC = 0.0000m;
+            if (NR > 0.00005m)
+            {
+                do
+                {
+                    PORC += LS;
+                } while (PORC - NR < -0.00005m);
+            }
+
+            //登记缺件表
+            sql = $"insert into ullageTempSingle values ";
+
+            //计算本期库存数量PAB = 计划订单收料量PORC + 预计在库量POH
+            PAB = PORC + POH;
+            //考虑更新PAB??   中间结果存内存，最终的值存在DeafaultAttr的store字段
+            //todo
+
+            //根据生产类型登记数据库表
+            switch (SHENGCLX)
+            {
+                case "0"://0原材料
+                    break;
+                case "1"://1自制件
+                    break;
+                case "2"://2外协
+                    break;
+                case "3"://3半成品
+                    break;
+                case "4"://4成品
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        private bool InitBomTree(long wuLBM)
+        {
+            bomTree.Clear();
+            return AddBomItem(wuLBM);
+        }
+
+        private bool AddBomItem(long wuLBM)
+        {
+            Bom bom = new Bom();
+            SqlDataReader reader = null;
+            string sql = $"select * from BOM where CmId = {wuLBM}";
+
+            using (SqlCommand cmd = new SqlCommand())
+            {
+                cmd.Connection = connection;
+                cmd.CommandText = sql;               
+                try
+                {
+                    reader = cmd.ExecuteReader();
+                    if (reader.HasRows)
+                    {
+                        bom.materielIdentfication = wuLBM;
+                        bom.tmpId = Convert.ToInt64(reader["tmpId"].ToString());
+                        bom.CTmpId = Convert.ToInt64(reader["CTmpId"].ToString());
+                        bom.CmId = Convert.ToInt64(reader["CmId"].ToString());
+                        bom.CNum = Convert.ToDecimal(reader["CNum"].ToString());
+                        bom.rlSeqNo = Convert.ToInt32(reader["rlSeqNo"].ToString());
+                        bom.peiTNo = Convert.ToInt32(reader["peiTNo"].ToString());
+                    }
+                    else
+                    {
+                        log.Error(string.Format($"查询BOM失败，BOMID={wuLBM}\n"));
+                        return false;
+                    }
+                }
+                catch (Exception e)
+                {
+                    log.Error(string.Format($"查询BOM失败，BOMID={wuLBM}\nError{e.StackTrace}"));
+                    return false;
+                }
+                finally
+                {
+                    reader.Close();
+                }
+
+                bomTree.Add(bom);
+
+                sql = $"select * from BOM where materielIdentfication = {wuLBM} ";
+                cmd.CommandText = sql;
+                try
+                {
+                    reader = cmd.ExecuteReader();
+                    if (reader.HasRows)
+                    {
+
+                        var childMId = Convert.ToInt64(reader["CmId"].ToString());
+                        if (!AddBomItem(childMId))
+                        {
+                            return false;
+                        }
+
+                    }
+                    else
+                    {                     
+                        return true;
+                    }
+                }
+                catch (Exception e)
+                {
+                    log.Error(string.Format($"查询BOM失败，BOMID={wuLBM}\nError{e.StackTrace}"));
+                    return false;
+                }
+                finally
+                {
+                    reader.Close();
+                }
+
+            }
+
+            return true;
 
         }
 
@@ -406,10 +496,16 @@ namespace BOM.Models
         public int flag { get; set; }  //1.本次排产用到该无聊 0.没有用到
     }
 
-public class BomTree
-{
-
-}
+    public class Bom
+    {
+        public long materielIdentfication { get; set; }
+        public long tmpId { get; set; }
+        public long CmId { get; set; }
+        public long CTmpId { get; set; }
+        public decimal CNum { get; set; }
+        public int rlSeqNo { get; set; }
+        public int peiTNo { get; set; }
+    }
     public class ShengChJH
     {
         public int biaoSh { get; set; }//标识
@@ -441,5 +537,4 @@ public class BomTree
         public string beiZh { get; set; }//备注
         public int heTTZhDCBBSh { get; set; }//合同通知单从表标识
     }
-
 }

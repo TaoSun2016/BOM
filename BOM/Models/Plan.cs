@@ -42,6 +42,13 @@ namespace BOM.Models
             //遍历生产计划记录
             foreach (PlanItem item in items)
             {
+                //初始化当前物料的BOM树
+                if (InitBomTree(item.wuLBM))
+                {
+                    log.Error(string.Format($"初始化BOM树失败，BOMID={item.wuLBM}\n"));
+                    return false;
+                }
+
                 if (!Calculate(option, item))
                 {
                     log.Error(string.Format($"Plan Failed!\n"));
@@ -84,7 +91,7 @@ namespace BOM.Models
                             item.PAB = Convert.ToDecimal(dataReader["_STORE_"].ToString());  //上期库存数量
                             item.SS = Convert.ToDecimal(dataReader["SS"].ToString());        //安全库存
                             item.LS = Convert.ToDecimal(dataReader["LS"].ToString());        //批量规则
-                            item.shengCLX = dataReader["SHENGCLX"].ToString();              //生产类型
+                            item.shengChXSh = dataReader["SHENGCLX"].ToString();              //生产形式
 
                             item.OH = 0.00m;                                                //获取在库数量OH
 
@@ -102,7 +109,7 @@ namespace BOM.Models
 
                             if (option == 1 || option == 3)//重排，预重排
                             {
-                                item.PAB = 0.00m;
+                                item.PAB = item.SOR + item.OH;
                             }
                             stocks.Add(item);
                         }
@@ -205,59 +212,52 @@ namespace BOM.Models
         /// </summary>
         private bool Calculate(int option, PlanItem item)
         {
-
-            decimal GR = shuL;          //毛需求量 GR 由前台上宋
-            decimal POH = 0.0000m;       //预计在库量
-            decimal SOR = 0.0000m;       //在途数量
-            decimal OH = 0.0000m;        //在库数量
-            decimal PAB = 0.0000m;       //上期库存数量
-            decimal SS = 0.0000m;        //安全库存
-            decimal NR = 0.0000m;        //净需求数量NR
-            decimal LS = 0.0000m;        //批量规则
-            decimal PORC = 0.0000m;      //计算计划订单收料量PORC
-            string SHENGCLX = null;     //生产类型 0原材料,1自制件,2外协,3半成品，4成品
-
-            //初始化BOM树
-            if (InitBomTree(item.wuLBM))
-            {
-                log.Error(string.Format($"初始化BOM树失败，BOMID={item.wuLBM}\n"));
-                return false;
-            }
             string sql = null;
             SqlDataReader dataReader = null;
 
-            var stock = stocks.Find(m => m.wuLBM == item.wuLBM);
+            decimal GR = item.shuL;          //毛需求量 GR 由前台上宋
+            decimal POH = 0.0000m;       //预计在库量
 
+            //decimal PORC = 0.0000m;      //计算计划订单收料量PORC
+            //string SHENGCLX = null;     //生产类型 0原材料,1自制件,2外协,3半成品，4成品
+
+
+
+
+            var stock = stocks.Find(m => m.wuLBM == item.wuLBM);
+            var wuL = bomTree.Find(m => m.CmId == item.wuLBM);
+
+
+            switch (stock.shengChXSh)
+            {
+                case "0"://原材料
+                    break;
+                case "1"://自制件
+                    break;
+                case "2"://外协
+                    break;
+                case "3"://半成品
+                    break;
+                case "4"://成品
+                    break;
+                default:
+                    break;
+            }
 
             //预计在库量 POH
-            if (Option == 1 || Option == 3)//重拍，预重拍
+            if (option == 1 || option == 3)//重拍，预重拍
             {
-
-                //获取在库数量OH
-                sql = $"select sum(kuCSh) from kuCShJB001 where wuLBM = {wuLBM}";
-                cmd.CommandText = sql;
-                try
-                {
-                    OH = Convert.ToDecimal(cmd.ExecuteScalar());
-                }
-                catch (Exception e)
-                {
-                    log.Error(string.Format($"Get OH error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                    throw;
-                }
-
-
                 //预计在库数量POH = 在途数量SOR + 在库数量OH - 毛需求量GR
-                POH = SOR + OH - GR;
+                POH = stock.SOR + stock.OH - GR;
             }
             else//续拍
             {
                 //预计在库数量POH=上期期末可用库存数量PAB-毛需求量GR
-                POH = PAB - GR;
+                POH = stock.PAB - GR;
             }
 
             //计算净需求数量NR
-            if (POH - SS >= 0.00005m)
+            if (POH - stock.SS >= 0.00005m)
             {
                 NR = 0.0000m;
             }
@@ -284,22 +284,7 @@ namespace BOM.Models
             //考虑更新PAB??   中间结果存内存，最终的值存在DeafaultAttr的store字段
             //todo
 
-            //根据生产类型登记数据库表
-            switch (SHENGCLX)
-            {
-                case "0"://0原材料
-                    break;
-                case "1"://1自制件
-                    break;
-                case "2"://2外协
-                    break;
-                case "3"://3半成品
-                    break;
-                case "4"://4成品
-                    break;
-                default:
-                    break;
-            }
+            
         }
 
         private bool InitBomTree(long wuLBM)
@@ -492,7 +477,7 @@ namespace BOM.Models
         public decimal PAB;        //上期可用库存量
         public decimal SS { get; set; } //安全库存
         public decimal LS { get; set; } //批量规则
-        public string shengCLX { get; set; }    //生产类型
+        public string shengChXSh { get; set; }    //生产形式  0原材料 1自制件 2外协 3半成品 4成品
         public int flag { get; set; }  //1.本次排产用到该无聊 0.没有用到
     }
 

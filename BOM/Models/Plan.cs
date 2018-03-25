@@ -43,7 +43,7 @@ namespace BOM.Models
             {
                 if (!Calculate(option, item))
                 {
-                    log.Error(string.Format($"Init Data Failed!\n"));
+                    log.Error(string.Format($"Plan Failed!\n"));
                     return false;
                 }
             }
@@ -59,8 +59,6 @@ namespace BOM.Models
         private bool InitData(int option)
         {
             SqlDataReader dataReader = null;
-
-
             stocks.Clear();
 
             //获取DeafaultAttr表中当前物料的参数
@@ -219,40 +217,7 @@ namespace BOM.Models
             string sql = null;
             SqlDataReader dataReader = null;
 
-            //获取DeafaultAttr表中当前物料的参数
-            using (SqlCommand cmd = new SqlCommand())
-            {
-                cmd.Connection = connection;
-                sql = $"select * from DeafaultAttr where materielIdentfication = {wuLBM}";
-                cmd.CommandText = sql;
-                try
-                {
-                    dataReader = cmd.ExecuteReader();
-                    if (dataReader.HasRows)
-                    {
-                        dataReader.Read();
-                        SOR = Convert.ToDecimal(dataReader["SR"].ToString());       //在途数量
-                        PAB = Convert.ToDecimal(dataReader["_STORE_"].ToString());  //上期库存数量
-                        SS = Convert.ToDecimal(dataReader["SS"].ToString());        //安全库存
-                        LS = Convert.ToDecimal(dataReader["LS"].ToString());        //批量规则
-                        SHENGCLX = dataReader["SHENGCLX"].ToString();        //批量规则
-
-                    }
-                    else
-                    {
-                        log.Error(string.Format($"Select DeafaultAttr error!\nsql[{sql}]\nError"));
-                        throw new Exception("No data found!");
-                    }
-                }
-                catch (Exception e)
-                {
-                    log.Error(string.Format($"Select DeafaultAttr error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                    throw;
-                }
-                finally
-                {
-                    dataReader.Close();
-                }
+            var stock = stocks.Find(m => m.wuLBM == item.wuLBM);
 
 
                 //预计在库量 POH
@@ -326,11 +291,6 @@ namespace BOM.Models
                     default:
                         break;
                 }
-
-
-
-
-
             }
 
         }
@@ -383,11 +343,6 @@ namespace BOM.Models
             return true;
         }
 
-        public void UpdatePAB()
-        {
-
-        }
-
 
         #region IDisposable Support
         private bool disposedValue = false; // To detect redundant calls
@@ -425,6 +380,36 @@ namespace BOM.Models
         #endregion
     }
 
+
+
+
+    public class PlanItem
+    {
+        public long wuLBM;         //物料编码
+        public decimal shuL;       //数量
+        public string gongZLH;     //工作令号
+        public string qiH;         //期号
+        public int xuH;            //序号
+        public DateTime jiaoHQ;    //交货期
+    }
+
+    public class Stock
+    {
+        public long wuLBM;         //物料编码
+        public decimal SOR;        //在途数量
+        public decimal OH;         //在库数量
+        public decimal POH;        //预计在库量
+        public decimal PAB;        //上期可用库存量
+        public decimal SS { get; set; } //安全库存
+        public decimal LS { get; set; } //批量规则
+        public string shengCLX { get; set; }    //生产类型
+        public int flag { get; set; }  //1.本次排产用到该无聊 0.没有用到
+    }
+
+public class BomTree
+{
+
+}
     public class ShengChJH
     {
         public int biaoSh { get; set; }//标识
@@ -455,30 +440,6 @@ namespace BOM.Models
         public int youXJ { get; set; }//优先级
         public string beiZh { get; set; }//备注
         public int heTTZhDCBBSh { get; set; }//合同通知单从表标识
-    }
-
-
-    public class PlanItem
-    {
-        public long wuLBM;         //物料编码
-        public decimal shuL;       //数量
-        public string gongZLH;     //工作令号
-        public string qiH;         //期号
-        public int xuH;            //序号
-        public DateTime jiaoHQ;    //交货期
-    }
-
-    public class Stock
-    {
-        public long wuLBM;         //物料编码
-        public decimal SOR;        //在途数量
-        public decimal OH;         //在库数量
-        public decimal POH;        //预计在库量
-        public decimal PAB;        //上期可用库存量
-        public decimal SS { get; set; } //安全库存
-        public decimal LS { get; set; } //批量规则
-        public string shengCLX { get; set; }    //生产类型
-        public int flag { get; set; }  //1.本次排产用到该无聊 0.没有用到
     }
 
 }

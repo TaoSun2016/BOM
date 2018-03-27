@@ -27,7 +27,7 @@ namespace BOM.Models
         public bool ProductionPlan(int option, List<PlanItem> requestItems)
         {
 
-
+            int i = 0;
             List<ShengChJH> listJH = new List<ShengChJH>();
             List<PlanItem> items = requestItems.OrderBy(m => m.qiH).ThenBy(m => m.xuH).ThenBy(m => m.gongZLH).ToList();
 
@@ -42,6 +42,7 @@ namespace BOM.Models
             //遍历生产计划记录
             foreach (PlanItem item in items)
             {
+                i++;
                 //初始化当前物料的BOM树
                 if (InitBomTree(item.wuLBM))
                 {
@@ -49,9 +50,11 @@ namespace BOM.Models
                     return false;
                 }
 
-                if (!Calculate(option, item))
+                Calculate(i, item);
+
+                if (!ProcessOrder(i))
                 {
-                    log.Error(string.Format($"Plan Failed!\n"));
+                    log.Error(string.Format($"Process Order Failed!\n"));
                     return false;
                 }
             }
@@ -210,81 +213,112 @@ namespace BOM.Models
         /// <summary>
         /// 计算单个物料的缺件信息和相关表单数据
         /// </summary>
-        private bool Calculate(int option, PlanItem item)
+        private void Calculate(int seqno, PlanItem item)
         {
-            string sql = null;
-            SqlDataReader dataReader = null;
-
-            decimal GR = item.shuL;          //毛需求量 GR 由前台上宋
-            decimal POH = 0.0000m;       //预计在库量
-
-            //decimal PORC = 0.0000m;      //计算计划订单收料量PORC
-            //string SHENGCLX = null;     //生产类型 0原材料,1自制件,2外协,3半成品，4成品
-
-
-
-
+            decimal multiple = 0.00m;
+            decimal surplus = 0.00m;
             var stock = stocks.Find(m => m.wuLBM == item.wuLBM);
-            var wuL = bomTree.Find(m => m.CmId == item.wuLBM);
+            stock.flag = seqno;
+            surplus = stock.PAB - stock.shuL;
+            stock.shuL += item.shuL;
 
-
-            switch (stock.shengChXSh)
+            if (surplus - item.shuL > -0.00005m)
             {
-                case "0"://原材料
-                    break;
-                case "1"://自制件
-                    break;
-                case "2"://外协
-                    break;
-                case "3"://半成品
-                    break;
-                case "4"://成品
-                    break;
-                default:
-                    break;
+                return;
             }
 
-            //预计在库量 POH
-            if (option == 1 || option == 3)//重拍，预重拍
+            if (surplus < 0.00005m)
             {
-                //预计在库数量POH = 在途数量SOR + 在库数量OH - 毛需求量GR
-                POH = stock.SOR + stock.OH - GR;
+                multiple = item.shuL;
             }
-            else//续拍
+            else if (surplus - item.shuL < 0.00005m)
             {
-                //预计在库数量POH=上期期末可用库存数量PAB-毛需求量GR
-                POH = stock.PAB - GR;
+                multiple = item.shuL - surplus;
             }
 
-            //计算净需求数量NR
-            if (POH - stock.SS >= 0.00005m)
+            //从BOM树种找到子物料，再逐个遍历，累计更新stacks相应物料的需求数量shuL
+            foreach( Bom bomnode in bomTree.Where(m => m.materielIdentfication == item.wuLBM))
             {
-                NR = 0.0000m;
-            }
-            else
-            {
-                NR = SS - POH;
-            }
+                PlanItem planItem = new PlanItem {
+                    wuLBM = bomnode.CmId,               //物料编码
+                    shuL = bomnode.CNum * multiple,     //数量
+                    gongZLH = item.gongZLH,             //工作令号
+                    qiH = item.qiH,                     //期号
+                    xuH =item.xuH,                      //序号
+                    jiaoHQ = item.jiaoHQ                //交货期
+                };
 
-            //计算计划订单收料量PORC,即为缺件数量
-            PORC = 0.0000m;
-            if (NR > 0.00005m)
+                Calculate(seqno, planItem);
+            }            
+        }
+
+        private bool ProcessOrder(int i)
+        {
+            decimal POH = 0.00m;    //预计在库量
+            decimal NR = 0.00m;    //净需求数量
+            decimal PORC = 0.00m;    //缺件数量
+
+            foreach (Stock stock in stocks.Where(m => m.flag == i))
             {
-                do
+                //预计在库量 POH
+                POH = stock.PAB - stock.shuL;
+
+                //计算净需求数量NR
+                if (POH - stock.SS > 0.00005m)
                 {
-                    PORC += LS;
-                } while (PORC - NR < -0.00005m);
+                    NR = 0.0000m;
+                }
+                else
+                {
+                    NR = stock.SS - POH;
+                }
+
+                //计算计划订单收料量PORC,即为缺件数量
+                PORC = 0.0000m;
+                if (NR > 0.00005m)
+                {
+                    do
+                    {
+                        PORC += stock.LS;
+                    } while (PORC - NR < -0.00005m);
+                }
+
+                //计算本期库存数量PAB = 计划订单收料量PORC + 预计在库量POH
+                stock.PAB = PORC + POH;
+
+
+                switch (stock.shengChXSh)
+                {
+                    case "0"://原材料
+                             // update DeafaultAttr set _store_ = PAB
+                             // update caiGShJB001 采购数据表
+                        break;
+                    case "1"://自制件
+                             // update DeafaultAttr set _store_ = PAB
+                             // delete gongXZhYZhBDZhB    工序转移准备单主表 应该只删除本令号本期号的吧？？？
+                             // insert gongXZhYZhBDZhB   根据期号和物料编码的姓编码，编成一个单据主表
+                             //delete gongXZhYZhBDCB     工序转移准备单从表 应该只删除本令号本期号的吧？？？
+                             // insert gongXZhYZhBDCB 令号+顺序号+物料编码+名称+规格+图号+计划数量  其它不用处理
+                             // 更新投料采购下达， update touLCGXD
+                        break;
+                    case "2"://外协
+                             // update DeafaultAttr set _store_ = PAB
+                             //清空更新[dbo].[外协出库准备单主表]，[dbo].[外协出库准备单从表]
+                        break;
+                    case "3"://半成品
+                        // update DeafaultAttr set _store_ = PAB
+                        // delete gongXZhYZhBDZhB    工序转移准备单主表 应该只删除本令号本期号的吧？？？
+                        // insert gongXZhYZhBDZhB   根据期号和物料编码的姓编码，编成一个单据主表
+                        //delete gongXZhYZhBDCB     工序转移准备单从表 应该只删除本令号本期号的吧？？？
+                        // insert gongXZhYZhBDCB 令号+顺序号+物料编码+名称+规格+图号+计划数量  其它不用处理
+                        break;
+                    case "4"://成品
+                        break;
+                    default:
+                        break;
+                }
             }
-
-            //登记缺件表
-            sql = $"insert into ullageTempSingle values ";
-
-            //计算本期库存数量PAB = 计划订单收料量PORC + 预计在库量POH
-            PAB = PORC + POH;
-            //考虑更新PAB??   中间结果存内存，最终的值存在DeafaultAttr的store字段
-            //todo
-
-            
+            return true;
         }
 
         private bool InitBomTree(long wuLBM)
@@ -370,54 +404,6 @@ namespace BOM.Models
 
         }
 
-        //处理原材料
-        private bool Process_0(SqlCommand cmd)
-        {
-            // update DeafaultAttr set _store_ = PAB
-            // update caiGShJB001 采购数据表
-            return true;
-        }
-
-        //处理自制件
-        private bool Process_1(SqlCommand cmd)
-        {
-            // update DeafaultAttr set _store_ = PAB
-            // delete gongXZhYZhBDZhB    工序转移准备单主表 应该只删除本令号本期号的吧？？？
-            // insert gongXZhYZhBDZhB   根据期号和物料编码的姓编码，编成一个单据主表
-            //delete gongXZhYZhBDCB     工序转移准备单从表 应该只删除本令号本期号的吧？？？
-            // insert gongXZhYZhBDCB 令号+顺序号+物料编码+名称+规格+图号+计划数量  其它不用处理
-            // 更新投料采购下达， update touLCGXD
-            return true;
-        }
-
-        //外协
-        private bool Process_2(SqlCommand cmd)
-        {
-            // update DeafaultAttr set _store_ = PAB
-            //清空更新[dbo].[外协出库准备单主表]，[dbo].[外协出库准备单从表]
-            return true;
-        }
-
-        //半成品
-        private bool Process_3(SqlCommand cmd)
-        {
-            // update DeafaultAttr set _store_ = PAB
-
-            // delete gongXZhYZhBDZhB    工序转移准备单主表 应该只删除本令号本期号的吧？？？
-            // insert gongXZhYZhBDZhB   根据期号和物料编码的姓编码，编成一个单据主表
-            //delete gongXZhYZhBDCB     工序转移准备单从表 应该只删除本令号本期号的吧？？？
-            // insert gongXZhYZhBDCB 令号+顺序号+物料编码+名称+规格+图号+计划数量  其它不用处理
-
-            return true;
-        }
-
-        //成品
-        private bool Process_4(SqlCommand cmd)
-        {
-            //清空更新[dbo].[成品入库准备单主表]，[dbo].[成品入库准备单从表]
-            return true;
-        }
-
 
         #region IDisposable Support
         private bool disposedValue = false; // To detect redundant calls
@@ -473,7 +459,7 @@ namespace BOM.Models
         public long wuLBM;         //物料编码
         public decimal SOR;        //在途数量
         public decimal OH;         //在库数量
-        public decimal POH;        //预计在库量
+        public decimal shuL;        //订单数量
         public decimal PAB;        //上期可用库存量
         public decimal SS { get; set; } //安全库存
         public decimal LS { get; set; } //批量规则

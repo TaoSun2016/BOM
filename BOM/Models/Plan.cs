@@ -52,7 +52,7 @@ namespace BOM.Models
 
                 Calculate(i, item);
 
-                if (!ProcessOrder(i))
+                if (!ProcessOrder(i, option, item))
                 {
                     log.Error(string.Format($"Process Order Failed!\n"));
                     return false;
@@ -149,6 +149,10 @@ namespace BOM.Models
                 cmd.Connection = connection;
                 foreach (Stock item in stocks)
                 {
+                    if (item.shengChXSh == "4")//成品不更新PAB
+                    {
+                        continue;
+                    }
                     if ((option == 2 || option == 4) && item.flag == 0)
                     {
                         continue;
@@ -252,7 +256,7 @@ namespace BOM.Models
             }            
         }
 
-        private bool ProcessOrder(int i)
+        private bool ProcessOrder(int i,int option, PlanItem item)
         {
             decimal POH = 0.00m;    //预计在库量
             decimal NR = 0.00m;    //净需求数量
@@ -286,47 +290,88 @@ namespace BOM.Models
                 //计算本期库存数量PAB = 计划订单收料量PORC + 预计在库量POH
                 stock.PAB = PORC + POH;
 
-
-                switch (stock.shengChXSh)
+                using (SqlCommand cmd = new SqlCommand())
                 {
-                    case "0"://原材料
-                             // update DeafaultAttr set _store_ = PAB
-                             // update caiGShJB001 采购数据表
-                        break;
-                    case "1"://自制件
-                             // update DeafaultAttr set _store_ = PAB
-                             // delete gongXZhYZhBDZhB    工序转移准备单主表 应该只删除本令号本期号的吧？？？
-                             // insert gongXZhYZhBDZhB   根据期号和物料编码的姓编码，编成一个单据主表
-                             //delete gongXZhYZhBDCB     工序转移准备单从表 应该只删除本令号本期号的吧？？？
-                             // insert gongXZhYZhBDCB 令号+顺序号+物料编码+名称+规格+图号+计划数量  其它不用处理
-                             // 更新投料采购下达， update touLCGXD
-                        break;
-                    case "2"://外协
-                             // update DeafaultAttr set _store_ = PAB
-                             //清空更新[dbo].[外协出库准备单主表]，[dbo].[外协出库准备单从表]
-                        break;
-                    case "3"://半成品
-                        // update DeafaultAttr set _store_ = PAB
-                        // delete gongXZhYZhBDZhB    工序转移准备单主表 应该只删除本令号本期号的吧？？？
-                        // insert gongXZhYZhBDZhB   根据期号和物料编码的姓编码，编成一个单据主表
-                        //delete gongXZhYZhBDCB     工序转移准备单从表 应该只删除本令号本期号的吧？？？
-                        // insert gongXZhYZhBDCB 令号+顺序号+物料编码+名称+规格+图号+计划数量  其它不用处理
-                        break;
-                    case "4"://成品
-                        break;
-                    default:
-                        break;
+                    cmd.Connection = connection;
+
+                    //登记缺件表
+                    sql = $"delete from ullageTempSingle insert into ullageTempSingle (wuLBM, gongZLBSh, mingCh, guiG, tuH, shengChXSh, gongShSh, queJShL, qiH, jiHBB, chunJHQJ, gongZLH) values ({stock.wuLBM},'','','','',{stock.shengChXSh},0.00,{PORC},{item.qiH},'',0.00,{item.gongZLH})";
+
+
+                    switch (stock.shengChXSh)
+                    {
+                        case "0"://原材料
+                                 // update caiGShJB001 采购数据表
+                            sql = $"select count(wuLBM) from caiGShJB001 where wuLBM = {stock.wuLBM}";
+                            cmd.CommandText = sql;
+                            try
+                            {
+                                var result = (int)cmd.ExecuteScalar();
+                                if (result == 1)//找到记录，更新原记录
+                                {
+                                    if (option == 1 || option == 3)//重排，预重排 覆盖原记录计划数量的值
+                                    {
+                                        sql = $"update caiGShJB001 set jiHShL = {PORC}， wanChShL = 0.00， leiJXDShL = 0.00， jinE = 0.00， heJJE = 0.00 where wuLBM = {stock.wuLBM}";
+                                    }
+                                    else//续排 在原记录基础上累加 完成数量wanChShL和累计下达数量leiJXDShL如何赋值??
+                                    {
+                                        sql = $"update caiGShJB001 set jiHShL = jiHShL + {PORC} where wuLBM = {stock.wuLBM}";
+                                    }
+                                    
+                                }
+                                else//找不到则登记新记录
+                                {
+                                    sql = $"insert into caiGShJB001 (wuLBM,jiHShL, wanChShL,leiJXDShL,jinE,heJJE,caiGY) values ({stock.wuLBM},{PORC},0.00,0.00,0.00,0.00,'')";
+                                }
+                                cmd.CommandText = sql;
+                                result = cmd.ExecuteNonQuery();
+                                if (result != 1)
+                                {
+                                    log.Error(string.Format($"update/insert caiGShJB001 Error\nsql[{sql}]\n"));
+                                    return false;
+                                }
+                            }
+                            catch (Exception e)
+                            {
+                                log.Error(string.Format($"Select caiGShJB001 Error\nsql[{sql}]\nError[{e.StackTrace}]"));
+                                return false;
+                            }
+                            break;
+                        case "1"://自制件
+                                 // delete gongXZhYZhBDZhB    工序转移准备单主表 应该只删除本令号本期号的吧？？？
+                                 // insert gongXZhYZhBDZhB   根据期号和物料编码的姓编码，编成一个单据主表
+                                 //delete gongXZhYZhBDCB     工序转移准备单从表 应该只删除本令号本期号的吧？？？
+                                 // insert gongXZhYZhBDCB 令号+顺序号+物料编码+名称+规格+图号+计划数量  其它不用处理
+                                 // 更新投料采购下达， update touLCGXD
+                            break;
+                        case "2"://外协
+                                 //清空更新[dbo].[外协出库准备单主表]，[dbo].[外协出库准备单从表]
+                            break;
+                        case "3"://半成品
+                                 // delete gongXZhYZhBDZhB    工序转移准备单主表 应该只删除本令号本期号的吧？？？
+                                 // insert gongXZhYZhBDZhB   根据期号和物料编码的姓编码，编成一个单据主表
+                                 //delete gongXZhYZhBDCB     工序转移准备单从表 应该只删除本令号本期号的吧？？？
+                                 // insert gongXZhYZhBDCB 令号+顺序号+物料编码+名称+规格+图号+计划数量  其它不用处理
+                            break;
+                        case "4"://成品
+                            break;
+                        default:
+                            break;
+                    }
                 }
+                   
             }
             return true;
         }
 
+        //初始化BOM树列表bomTree
         private bool InitBomTree(long wuLBM)
         {
             bomTree.Clear();
             return AddBomItem(wuLBM);
         }
 
+        //将BOM表中的一个BOM树递归登记到列表bomTree中
         private bool AddBomItem(long wuLBM)
         {
             Bom bom = new Bom();

@@ -19,14 +19,11 @@ namespace BOM.Models
             connection = DBConnection.OpenConnection();
         }
 
-
-
         /// <summary>
         /// 排产
         /// </summary>
         public bool ProductionPlan(int option, List<PlanItem> requestItems)
         {
-
             int i = 0;
             List<ShengChJH> listJH = new List<ShengChJH>();
             List<PlanItem> items = requestItems.OrderBy(m => m.qiH).ThenBy(m => m.xuH).ThenBy(m => m.gongZLH).ToList();
@@ -36,7 +33,6 @@ namespace BOM.Models
             {
                 log.Error(string.Format($"Init Data Failed!\n"));
                 return false;
-
             }
 
             //遍历生产计划记录
@@ -49,9 +45,14 @@ namespace BOM.Models
                     log.Error(string.Format($"初始化BOM树失败，BOMID={item.wuLBM}\n"));
                     return false;
                 }
-
+                if (!CheckData(i, item))
+                {
+                    log.Error(string.Format($"数据检查失败，BOMID={item.wuLBM}\n"));
+                    return false;
+                }
                 Calculate(i, item);
 
+                //处理当前记录，令号，期号，顺序号
                 if (!ProcessOrder(i, option, item))
                 {
                     log.Error(string.Format($"Process Order Failed!\n"));
@@ -67,7 +68,10 @@ namespace BOM.Models
             }
             return true;
         }
-
+        private bool CheckData(int i, PlanItem item)
+        {
+            return true;
+        }
         private bool InitData(int option)
         {
             SqlDataReader dataReader = null;
@@ -89,12 +93,16 @@ namespace BOM.Models
                         {
                             var item = new Stock();
                             item.flag = 0;
-                            item.wuLBM = Convert.ToInt64(dataReader["materielIdentfication"].ToString());//物料编码
-                            item.SOR = Convert.ToDecimal(dataReader["SR"].ToString());       //在途数量
-                            item.PAB = Convert.ToDecimal(dataReader["_STORE_"].ToString());  //上期库存数量
-                            item.SS = Convert.ToDecimal(dataReader["SS"].ToString());        //安全库存
-                            item.LS = Convert.ToDecimal(dataReader["LS"].ToString());        //批量规则
-                            item.shengChXSh = dataReader["SHENGCLX"].ToString();              //生产形式
+                            item.wuLBM = Convert.ToInt64(dataReader["materielIdentfication"].ToString());   //物料编码
+                            item.SOR = Convert.ToDecimal(dataReader["SR"].ToString());          //在途数量
+                            item.PAB = Convert.ToDecimal(dataReader["_STORE_"].ToString());     //上期库存数量
+                            item.SS = Convert.ToDecimal(dataReader["SS"].ToString());           //安全库存
+                            item.LS = Convert.ToDecimal(dataReader["LS"].ToString());           //批量规则
+                            item.shengChXSh = dataReader["SHENGCLX"].ToString();                //生产形式
+                            item.touLBSh = Convert.ToInt64(dataReader["touLBSh"].ToString());   //投料标识
+                            item.zum = dataReader["zum"].ToString();                            //工序号
+                            item.tuhao = dataReader["tuhao"].ToString();                            //图号
+                            item.guige = dataReader["guige"].ToString();                            //规格
 
                             item.OH = 0.00m;                                                //获取在库数量OH
 
@@ -136,7 +144,6 @@ namespace BOM.Models
                 return true;
             }
         }
-
 
         private bool UpdatePAB(int option)
         {
@@ -219,8 +226,8 @@ namespace BOM.Models
         /// </summary>
         private void Calculate(int seqno, PlanItem item)
         {
-            decimal multiple = 0.00m;
-            decimal surplus = 0.00m;
+            decimal multiple = 0.00m;       //当前物料不足的数量
+            decimal surplus = 0.00m;        //上期剩余减去当前物料需要的数量后，剩余的数量
             var stock = stocks.Find(m => m.wuLBM == item.wuLBM);
             stock.flag = seqno;
             surplus = stock.PAB - stock.shuL;
@@ -241,22 +248,23 @@ namespace BOM.Models
             }
 
             //从BOM树种找到子物料，再逐个遍历，累计更新stacks相应物料的需求数量shuL
-            foreach( Bom bomnode in bomTree.Where(m => m.materielIdentfication == item.wuLBM))
+            foreach (Bom bomnode in bomTree.Where(m => m.materielIdentfication == item.wuLBM))
             {
-                PlanItem planItem = new PlanItem {
+                PlanItem planItem = new PlanItem
+                {
                     wuLBM = bomnode.CmId,               //物料编码
                     shuL = bomnode.CNum * multiple,     //数量
                     gongZLH = item.gongZLH,             //工作令号
                     qiH = item.qiH,                     //期号
-                    xuH =item.xuH,                      //序号
+                    xuH = item.xuH,                      //序号
                     jiaoHQ = item.jiaoHQ                //交货期
                 };
 
                 Calculate(seqno, planItem);
-            }            
+            }
         }
 
-        private bool ProcessOrder(int i,int option, PlanItem item)
+        private bool ProcessOrder(int i, int option, PlanItem item)
         {
             decimal POH = 0.00m;    //预计在库量
             decimal NR = 0.00m;    //净需求数量
@@ -294,8 +302,26 @@ namespace BOM.Models
                 {
                     cmd.Connection = connection;
 
-                    //登记缺件表
-                    sql = $"delete from ullageTempSingle insert into ullageTempSingle (wuLBM, gongZLBSh, mingCh, guiG, tuH, shengChXSh, gongShSh, queJShL, qiH, jiHBB, chunJHQJ, gongZLH) values ({stock.wuLBM},'','','','',{stock.shengChXSh},0.00,{PORC},{item.qiH},'',0.00,{item.gongZLH})";
+                    //所有的生产形式都要登记缺件表
+                    if (option == 1 || option == 3)
+                    {
+                        sql = $"delete from ullageTempSingle where gongZLH={item.gongZLH} and qiH={item.qiH} and wuLBM={stock.wuLBM} insert into ullageTempSingle (wuLBM, gongZLBSh, mingCh, guiG, tuH, shengChXSh, gongShSh, queJShL, qiH, jiHBB, chunJHQJ, gongZLH) values ({stock.wuLBM},'','','','',{stock.shengChXSh},0.00,{PORC},{item.qiH},'',0.00,{item.gongZLH})";
+                    }
+                    else//续排原来要求登记新的缺件表，旧表中的数据有什么用??没有直接覆盖就行，否则很难控制交替使用不同的表
+                    {
+                        sql = $"delete from ullageTempSingle where gongZLH={item.gongZLH} and qiH={item.qiH} and wuLBM={stock.wuLBM} insert into ullageTempSingle (wuLBM, gongZLBSh, mingCh, guiG, tuH, shengChXSh, gongShSh, queJShL, qiH, jiHBB, chunJHQJ, gongZLH) values ({stock.wuLBM},'','','','',{stock.shengChXSh},0.00,{PORC},{item.qiH},'',0.00,{item.gongZLH})";
+                    }
+                    cmd.CommandText = sql;
+                    try
+                    {
+                        var result = cmd.ExecuteNonQuery();
+                    }
+                    catch (Exception e)
+                    {
+                        log.Error(string.Format($"update ullageTempSingle Error\nsql[{sql}]\nError[{e.StackTrace}]"));
+                        return false;
+                    }
+
 
 
                     switch (stock.shengChXSh)
@@ -317,9 +343,9 @@ namespace BOM.Models
                                     {
                                         sql = $"update caiGShJB001 set jiHShL = jiHShL + {PORC} where wuLBM = {stock.wuLBM}";
                                     }
-                                    
+
                                 }
-                                else//找不到则登记新记录
+                                else//找不到则登记新记录,计划数量= 缺件数量，其它为0
                                 {
                                     sql = $"insert into caiGShJB001 (wuLBM,jiHShL, wanChShL,leiJXDShL,jinE,heJJE,caiGY) values ({stock.wuLBM},{PORC},0.00,0.00,0.00,0.00,'')";
                                 }
@@ -338,20 +364,280 @@ namespace BOM.Models
                             }
                             break;
                         case "1"://自制件
-                                 // delete gongXZhYZhBDZhB    工序转移准备单主表 应该只删除本令号本期号的吧？？？
-                                 // insert gongXZhYZhBDZhB   根据期号和物料编码的姓编码，编成一个单据主表
-                                 //delete gongXZhYZhBDCB     工序转移准备单从表 应该只删除本令号本期号的吧？？？
-                                 // insert gongXZhYZhBDCB 令号+顺序号+物料编码+名称+规格+图号+计划数量  其它不用处理
-                                 // 更新投料采购下达， update touLCGXD
+                            //工序转移准备单主表 gongXZhYZhBDZhB
+                            sql = $"select count(wuLBM) from gongXZhYZhBDZhB where gongZLH = {item.gongZLH} and qiH = {item.qiH} and wuLBM = {stock.wuLBM}";
+                            cmd.CommandText = sql;
+                            try
+                            {
+                                var result = (int)cmd.ExecuteScalar();
+                                if (result == 1)//找到记录，更新原记录
+                                {
+                                    if (option == 1 || option == 3)//重排，预重排 覆盖原记录计划数量的值
+                                    {
+                                        //?? 给哪些字段赋值
+                                        sql = $"delete from gongXZhYZhBDZhB where gongZLH = {item.gongZLH} and qiH = {item.qiH} and wuLBM = {stock.wuLBM} ";
+                                    }
+                                    else//续排 报错??应该是查到续排前有重复的领号，期号，序号的记录就报错
+                                    {
+                                        log.Error(string.Format($"续排，物料为自制件，工序转移准备单主表已有记录r\nsql[{sql}]\n"));
+                                        return false;
+                                    }
+                                }
+
+                                //产品名称：物料的模板编码
+                                var chanPMCh = "";
+                                var pos = stock.wuLBM.ToString().IndexOf("9");
+                                if (pos >= 0)
+                                {
+                                    chanPMCh = stock.wuLBM.ToString().Substring(0, pos);
+                                }
+
+                                sql = sql + $"insert into gongXZhYZhBDZhB (wuLBM,chanPMCh，gongXBSh) values ({stock.wuLBM},{chanPMCh}，{stock.zum})";
+
+                                cmd.CommandText = sql;
+                                result = cmd.ExecuteNonQuery();
+                                if (result != 1)
+                                {
+                                    log.Error(string.Format($"update/insert gongXZhYZhBDZhB Error\nsql[{sql}]\n"));
+                                    return false;
+                                }
+                            }
+                            catch (Exception e)
+                            {
+                                log.Error(string.Format($"process gongXZhYZhBDZhB Error\nsql[{sql}]\nError[{e.StackTrace}]"));
+                                return false;
+                            }
+
+                            //工序转移准备单从表 gongXZhYZhBDCB
+                            sql = $"select count(wuLBM) from gongXZhYZhBDCB where gongZLH = {item.gongZLH} and qiH = {item.qiH} and xuH = {item.xuH} and wuLBM = {stock.wuLBM}";
+                            cmd.CommandText = sql;
+                            try
+                            {
+                                var result = (int)cmd.ExecuteScalar();
+                                if (result == 1)//找到记录，更新原记录
+                                {
+                                    if (option == 1 || option == 3)//重排，预重排 覆盖原记录计划数量的值
+                                    {
+                                        //
+                                        sql = $"delete from gongXZhYZhBDCB where gongZLH = {item.gongZLH} and qiH = {item.qiH} and xuH = {item.xuH} and wuLBM = {stock.wuLBM} ";
+                                    }
+                                    else//续排 报错??
+                                    {
+                                        log.Error(string.Format($"续排，物料为自制件，工序转移准备单从表已有记录r\nsql[{sql}]\n"));
+                                        return false;
+                                    }
+                                }
+
+                                sql = sql + $"insert into gongXZhYZhBDCB (gongZLH, qiH, xuH, wuLBM, jiHShL,tuH, guiG ) values ({item.gongZLH},{item.qiH},{item.xuH},{stock.wuLBM},{PORC},{stock.tuhao},{stock.guige})";
+
+                                cmd.CommandText = sql;
+                                result = cmd.ExecuteNonQuery();
+                                if (result != 1)
+                                {
+                                    log.Error(string.Format($"update/insert gongXZhYZhBDCB Error\nsql[{sql}]\n"));
+                                    return false;
+                                }
+                            }
+                            catch (Exception e)
+                            {
+                                log.Error(string.Format($"process gongXZhYZhBDCB Error\nsql[{sql}]\nError[{e.StackTrace}]"));
+                                return false;
+                            }
+
+                            // 更新投料采购下达  touLCGXD
+                            sql = $"select count(wuLBM) from touLCGXD where gongZLH = {item.gongZLH} and qiH = {item.qiH} and wuLBM = {stock.wuLBM}";
+                            cmd.CommandText = sql;
+                            try
+                            {
+                                var result = (int)cmd.ExecuteScalar();
+                                if (result == 1)//找到记录，更新原记录
+                                {
+                                    if (option == 1 || option == 3)//重排，预重排 覆盖原记录计划数量的值
+                                    {
+                                        sql = $"update touLCGXD set queJShL = {PORC}， chunJHQJ = 0.00， leiJXDShL = 0.00 where gongZLH = {item.gongZLH} and qiH = {item.qiH} and wuLBM = {stock.wuLBM}";
+                                    }
+                                    else//续排 在原记录基础上累加??
+                                    {
+                                        sql = $"update touLCGXD set queJShL = queJShL + {PORC} where gongZLH = {item.gongZLH} and qiH = {item.qiH} and wuLBM = {stock.wuLBM}";
+                                    }
+
+                                }
+                                else//找不到则登记新记录:缺件数量=PORC ?? 纯计划缺件取值待定
+                                {
+                                    sql = $"insert into touLCGXD (wuLBM,queJShL, chunJHQJ,qiH,gongZLH,shengChXSh，touLBSh) values ({stock.wuLBM},{PORC},0.00,{item.qiH},{item.gongZLH},{stock.shengChXSh},{stock.touLBSh})";
+                                }
+                                cmd.CommandText = sql;
+                                result = cmd.ExecuteNonQuery();
+                                if (result != 1)
+                                {
+                                    log.Error(string.Format($"update/insert touLCGXD Error\nsql[{sql}]\n"));
+                                    return false;
+                                }
+                            }
+                            catch (Exception e)
+                            {
+                                log.Error(string.Format($"process touLCGXD Error\nsql[{sql}]\nError[{e.StackTrace}]"));
+                                return false;
+                            }
                             break;
+
                         case "2"://外协
-                                 //清空更新[dbo].[外协出库准备单主表]，[dbo].[外协出库准备单从表]
+                                 //外协出库准备单主表waiXChKZhBDZB  ??
+                            sql = $"select count(wuLBM) from waiXChKZhBDZB where gongZLH = {item.gongZLH} and qiH = {item.qiH} and xuH = {item.xuH} and wuLBM = {stock.wuLBM}";
+                            cmd.CommandText = sql;
+                            try
+                            {
+                                var result = (int)cmd.ExecuteScalar();
+                                if (result == 1)//找到记录，更新原记录
+                                {
+                                    if (option == 1 || option == 3)//重排，预重排 覆盖原记录计划数量的值
+                                    {
+                                        //
+                                        sql = $"delete from waiXChKZhBDZB where gongZLH = {item.gongZLH} and qiH = {item.qiH} and xuH = {item.xuH} and wuLBM = {stock.wuLBM} ";
+                                    }
+                                    else//续排 报错??
+                                    {
+                                        log.Error(string.Format($"续排，物料为外协件，外协出库准备单主表已有记录r\nsql[{sql}]\n"));
+                                        return false;
+                                    }
+
+                                }
+
+                                sql = sql + $"insert into waiXChKZhBDZB (gongZLH, qiH, xuH, wuLBM, tuH, guiG ) values ({item.gongZLH},{item.qiH},{item.xuH},{stock.wuLBM},{stock.tuhao},{stock.guige})";
+
+                                cmd.CommandText = sql;
+                                result = cmd.ExecuteNonQuery();
+                                if (result != 1)
+                                {
+                                    log.Error(string.Format($"update/insert waiXChKZhBDZB Error\nsql[{sql}]\n"));
+                                    return false;
+                                }
+                            }
+                            catch (Exception e)
+                            {
+                                log.Error(string.Format($"process waiXChKZhBDZB Error\nsql[{sql}]\nError[{e.StackTrace}]"));
+                                return false;
+                            }
+
+                            //外协出库准备单从表 waiXChKZhBDCB
+                            sql = $"select count(wuLBM) from waiXChKZhBDCB where gongZLH = {item.gongZLH} and qiH = {item.qiH} and xuH = {item.xuH} and wuLBM = {stock.wuLBM}";
+                            cmd.CommandText = sql;
+                            try
+                            {
+                                var result = (int)cmd.ExecuteScalar();
+                                if (result == 1)//找到记录，更新原记录
+                                {
+                                    if (option == 1 || option == 3)//重排，预重排 覆盖原记录计划数量的值
+                                    {
+                                        //
+                                        sql = $"delete from waiXChKZhBDCB where gongZLH = {item.gongZLH} and qiH = {item.qiH} and xuH = {item.xuH} and wuLBM = {stock.wuLBM} ";
+                                    }
+                                    else//续排 报错??
+                                    {
+                                        log.Error(string.Format($"续排，物料为外协件，外协出库准备单从表已有记录r\nsql[{sql}]\n"));
+                                        return false;
+                                    }
+
+                                }
+
+                                sql = sql + $"insert into waiXChKZhBDCB (gongZLH, qiH, xuH, wuLBM, tuH, guiG, jiHShL ) values ({item.gongZLH},{item.qiH},{item.xuH},{stock.wuLBM},{stock.tuhao},{stock.guige},{PORC})";
+
+                                cmd.CommandText = sql;
+                                result = cmd.ExecuteNonQuery();
+                                if (result != 1)
+                                {
+                                    log.Error(string.Format($"update/insert waiXChKZhBDCB Error\nsql[{sql}]\n"));
+                                    return false;
+                                }
+                            }
+                            catch (Exception e)
+                            {
+                                log.Error(string.Format($"process waiXChKZhBDCB Error\nsql[{sql}]\nError[{e.StackTrace}]"));
+                                return false;
+                            }
                             break;
                         case "3"://半成品
-                                 // delete gongXZhYZhBDZhB    工序转移准备单主表 应该只删除本令号本期号的吧？？？
-                                 // insert gongXZhYZhBDZhB   根据期号和物料编码的姓编码，编成一个单据主表
-                                 //delete gongXZhYZhBDCB     工序转移准备单从表 应该只删除本令号本期号的吧？？？
-                                 // insert gongXZhYZhBDCB 令号+顺序号+物料编码+名称+规格+图号+计划数量  其它不用处理
+                            //工序转移准备单主表 gongXZhYZhBDZhB
+                            sql = $"select count(wuLBM) from gongXZhYZhBDZhB where gongZLH = {item.gongZLH} and qiH = {item.qiH} and wuLBM = {stock.wuLBM}";
+                            cmd.CommandText = sql;
+                            try
+                            {
+                                var result = (int)cmd.ExecuteScalar();
+                                if (result == 1)//找到记录，更新原记录
+                                {
+                                    if (option == 1 || option == 3)//重排，预重排 覆盖原记录计划数量的值
+                                    {
+                                        //?? 给哪些字段赋值
+                                        sql = $"delete from gongXZhYZhBDZhB where gongZLH = {item.gongZLH} and qiH = {item.qiH} and wuLBM = {stock.wuLBM} ";
+                                    }
+                                    else//续排 报错??应该是查到续排前有重复的领号，期号，序号的记录就报错
+                                    {
+                                        log.Error(string.Format($"续排，物料为自制件，工序转移准备单主表已有记录r\nsql[{sql}]\n"));
+                                        return false;
+                                    }
+
+                                }
+
+                                //产品名称：物料的模板编码
+                                var chanPMCh = "";
+                                var pos = stock.wuLBM.ToString().IndexOf("9");
+                                if (pos >= 0)
+                                {
+                                    chanPMCh = stock.wuLBM.ToString().Substring(0, pos);
+                                }
+
+                                sql = sql + $"insert into gongXZhYZhBDZhB (wuLBM,chanPMCh，gongXBSh) values ({stock.wuLBM},{chanPMCh}，{stock.zum})";
+
+                                cmd.CommandText = sql;
+                                result = cmd.ExecuteNonQuery();
+                                if (result != 1)
+                                {
+                                    log.Error(string.Format($"update/insert gongXZhYZhBDZhB Error\nsql[{sql}]\n"));
+                                    return false;
+                                }
+                            }
+                            catch (Exception e)
+                            {
+                                log.Error(string.Format($"process gongXZhYZhBDZhB Error\nsql[{sql}]\nError[{e.StackTrace}]"));
+                                return false;
+                            }
+
+                            //工序转移准备单从表 gongXZhYZhBDCB
+                            sql = $"select count(wuLBM) from gongXZhYZhBDCB where gongZLH = {item.gongZLH} and qiH = {item.qiH} and xuH = {item.xuH} and wuLBM = {stock.wuLBM}";
+                            cmd.CommandText = sql;
+                            try
+                            {
+                                var result = (int)cmd.ExecuteScalar();
+                                if (result == 1)//找到记录，更新原记录
+                                {
+                                    if (option == 1 || option == 3)//重排，预重排 覆盖原记录计划数量的值
+                                    {
+                                        //
+                                        sql = $"delete from gongXZhYZhBDCB where gongZLH = {item.gongZLH} and qiH = {item.qiH} and xuH = {item.xuH} and wuLBM = {stock.wuLBM} ";
+                                    }
+                                    else//续排 报错??
+                                    {
+                                        log.Error(string.Format($"续排，物料为自制件，工序转移准备单从表已有记录r\nsql[{sql}]\n"));
+                                        return false;
+                                    }
+
+                                }
+
+                                sql = sql + $"insert into gongXZhYZhBDCB (gongZLH, qiH, xuH, wuLBM, jiHShL,tuH, guiG ) values ({item.gongZLH},{item.qiH},{item.xuH},{stock.wuLBM},{PORC},{stock.tuhao},{stock.guige})";
+
+                                cmd.CommandText = sql;
+                                result = cmd.ExecuteNonQuery();
+                                if (result != 1)
+                                {
+                                    log.Error(string.Format($"update/insert gongXZhYZhBDCB Error\nsql[{sql}]\n"));
+                                    return false;
+                                }
+                            }
+                            catch (Exception e)
+                            {
+                                log.Error(string.Format($"process gongXZhYZhBDCB Error\nsql[{sql}]\nError[{e.StackTrace}]"));
+                                return false;
+                            }
                             break;
                         case "4"://成品
                             break;
@@ -359,7 +645,6 @@ namespace BOM.Models
                             break;
                     }
                 }
-                   
             }
             return true;
         }
@@ -376,12 +661,12 @@ namespace BOM.Models
         {
             Bom bom = new Bom();
             SqlDataReader reader = null;
-            string sql = $"select * from BOM where CmId = {wuLBM}";
 
             using (SqlCommand cmd = new SqlCommand())
             {
                 cmd.Connection = connection;
-                cmd.CommandText = sql;               
+                sql = $"select * from BOM where CmId = {wuLBM}";
+                cmd.CommandText = sql;
                 try
                 {
                     reader = cmd.ExecuteReader();
@@ -411,6 +696,27 @@ namespace BOM.Models
                     reader.Close();
                 }
 
+                //替代物料信息获取
+                sql = $"select * from substitute where origmid = {wuLBM}";
+                cmd.CommandText = sql;
+                try
+                {
+                    reader = cmd.ExecuteReader();
+                    if (reader.HasRows)
+                    {
+                        bom.substitute = Convert.ToInt64(reader["substitute"].ToString());
+                    }
+                }
+                catch (Exception e)
+                {
+                    log.Error(string.Format($"查询物料替代表失败，BOMID={wuLBM}\nError{e.StackTrace}"));
+                    return false;
+                }
+                finally
+                {
+                    reader.Close();
+                }
+
                 bomTree.Add(bom);
 
                 sql = $"select * from BOM where materielIdentfication = {wuLBM} ";
@@ -429,7 +735,7 @@ namespace BOM.Models
 
                     }
                     else
-                    {                     
+                    {
                         return true;
                     }
                 }
@@ -509,18 +815,24 @@ namespace BOM.Models
         public decimal SS { get; set; } //安全库存
         public decimal LS { get; set; } //批量规则
         public string shengChXSh { get; set; }    //生产形式  0原材料 1自制件 2外协 3半成品 4成品
+        public long touLBSh { get; set; }   //投料标识
+        public string zum { get; set; }     //工序号
+        public string tuhao { get; set; }   //图号
+        public string guige { get; set; }   //规格
+
         public int flag { get; set; }  //1.本次排产用到该无聊 0.没有用到
     }
 
     public class Bom
     {
-        public long materielIdentfication { get; set; }
-        public long tmpId { get; set; }
-        public long CmId { get; set; }
-        public long CTmpId { get; set; }
-        public decimal CNum { get; set; }
+        public long materielIdentfication { get; set; }     //父物料编码
+        public long tmpId { get; set; }         //父物料模板ID
+        public long CmId { get; set; }          //物料编码
+        public long CTmpId { get; set; }        //物料模板ID
+        public decimal CNum { get; set; }       
         public int rlSeqNo { get; set; }
-        public int peiTNo { get; set; }
+        public int peiTNo { get; set; }         //配套标识
+        public long substitute { get; set; }    //替代物料编码
     }
     public class ShengChJH
     {

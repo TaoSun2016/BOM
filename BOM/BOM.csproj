@@ -89,6 +89,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="App_Start\WebApiConfig.cs" />
+    <Compile Include="Controllers\PlanController.cs" />
     <Compile Include="Controllers\RelationController.cs" />
     <Compile Include="Controllers\AttrDefineOperationController.cs" />
     <Compile Include="Controllers\BOMController.cs" />

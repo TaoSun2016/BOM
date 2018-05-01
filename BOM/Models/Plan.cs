@@ -45,7 +45,7 @@ namespace BOM.Models
             {
                 i++;
                 //初始化当前物料的BOM树
-                if (InitBomTree(item.wuLBM))
+                if (InitBomTree(item))
                 {
                     log.Error(string.Format($"初始化BOM树失败，BOMID={item.wuLBM}\n"));
                     return false;
@@ -82,7 +82,7 @@ namespace BOM.Models
             SqlDataReader dataReader = null;
             stocks.Clear();
 
-            //获取DeafaultAttr表中当前物料的参数
+            //获取DeafaultAttr表中当前所有物料的参数
             using (SqlCommand cmd1 = new SqlCommand())
             {
                 sql = $"select * from DeafaultAttr";
@@ -647,19 +647,44 @@ namespace BOM.Models
         }
 
         //初始化BOM树列表bomTree
-        private bool InitBomTree(long wuLBM)
+        private bool InitBomTree(PlanItem item)
         {
             bomTree.Clear();
-            return AddBomItem(wuLBM);
+            return AddBomItem(item.wuLBM, item.qiH, item.gongZLH);
         }
 
         //将BOM表中的一个BOM树递归登记到列表bomTree中
-        private bool AddBomItem(long wuLBM)
+        private bool AddBomItem(long wuLBM, string qiH, string gongZLH)
         {
+            long tmpWuLBM = 0l;
             Bom bom = new Bom();
             SqlDataReader reader = null;
 
-            sql = $"select * from BOM where CmId = {wuLBM}";
+            sql = $"select daiWLBM from daiYJJHZhB z, daiYJJHCB c where c.zhuBBSh = z.biaoSh and c.yuanWLBM = z.wuLBM and c.yuanWLTH = z.tuH and c.yuanWLGG=z.GuiG and z.qiH='{qiH}' and z.gongZLH = '{gongZLH}' and z.wuLBM={wuLBM}";
+            cmd.CommandText = sql;
+            try
+            {
+                reader = cmd.ExecuteReader();
+                if (reader.HasRows)
+                {
+                    tmpWuLBM = Convert.ToInt64(reader["daiWLBMh"].ToString());
+                }
+                else {
+                    tmpWuLBM = wuLBM;
+                }
+
+            }
+            catch (Exception e)
+            {
+                log.Error(string.Format($"查询代用件计划表失败，SQL={sql}\nError{e.StackTrace}"));
+                return false;
+            }
+            finally
+            {
+                reader?.Close();
+            }
+
+            sql = $"select * from BOM where CmId = {tmpWuLBM}";
             cmd.CommandText = sql;
             try
             {
@@ -676,34 +701,13 @@ namespace BOM.Models
                 }
                 else
                 {
-                    log.Error(string.Format($"查询BOM失败，BOMID={wuLBM}\n"));
+                    log.Error(string.Format($"查询BOM失败，SQL={sql}\n"));
                     return false;
                 }
             }
             catch (Exception e)
             {
-                log.Error(string.Format($"查询BOM失败，BOMID={wuLBM}\nError{e.StackTrace}"));
-                return false;
-            }
-            finally
-            {
-                reader.Close();
-            }
-
-            //替代物料信息获取??
-            sql = $"select * from substitute where origmid = {wuLBM}";
-            cmd.CommandText = sql;
-            try
-            {
-                reader = cmd.ExecuteReader();
-                if (reader.HasRows)
-                {
-                    bom.substitute = Convert.ToInt64(reader["substitute"].ToString());
-                }
-            }
-            catch (Exception e)
-            {
-                log.Error(string.Format($"查询物料替代表失败，BOMID={wuLBM}\nError{e.StackTrace}"));
+                log.Error(string.Format($"查询BOM失败，SQL={sql}\nError{e.StackTrace}"));
                 return false;
             }
             finally
@@ -724,13 +728,11 @@ namespace BOM.Models
                     while (reader.Read())
                     {
                         var childMId = Convert.ToInt64(reader["CmId"].ToString());
-                        if (!AddBomItem(childMId))
+                        if (!AddBomItem(childMId,qiH,gongZLH))
                         {
                             return false;
                         }
                     }
-
-
                 }
                 else
                 {
@@ -739,7 +741,7 @@ namespace BOM.Models
             }
             catch (Exception e)
             {
-                log.Error(string.Format($"查询BOM失败，BOMID={wuLBM}\nError{e.StackTrace}"));
+                log.Error(string.Format($"查询BOM失败，SQL={sql}\nError{e.StackTrace}"));
                 return false;
             }
             finally

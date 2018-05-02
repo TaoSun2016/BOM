@@ -25,9 +25,9 @@ namespace BOM.Controllers
             command.Connection = sqlConnection;
             command.Transaction = transaction;
 
-            Plan plan = new Plan(sqlConnection, command, transaction);
+            Plan plan = new Plan(option, sqlConnection, command, transaction);
 
-            if (!plan.CreatePlan(option, requestItems))
+            if (!plan.CreatePlan(requestItems))
             {
                 transaction.Rollback();
                 command.Dispose();

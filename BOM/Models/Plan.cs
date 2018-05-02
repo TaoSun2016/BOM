@@ -14,12 +14,16 @@ namespace BOM.Models
         private SqlCommand cmd = new SqlCommand();
         private SqlTransaction transaction = null;
 
+        private int option;
 
+        //tableFlag=0时，续排登记缺件表1，PAB登记daefault._store1_,否则登记缺件表，PAB登记daefault._store_
+        private int tableFlag = 0;
         string sql = null;
         List<Stock> stocks = new List<Stock>();
         List<Bom> bomTree = new List<Bom>();
-        public Plan(SqlConnection conn, SqlCommand sqlCommand, SqlTransaction sqlTransaction)
+        public Plan(int option, SqlConnection conn, SqlCommand sqlCommand, SqlTransaction sqlTransaction)
         {
+            this.option = option;
             connection = conn;
             cmd = sqlCommand;
             transaction = sqlTransaction;
@@ -28,13 +32,13 @@ namespace BOM.Models
         /// <summary>
         /// 排产
         /// </summary>
-        public bool CreatePlan(int option, List<PlanItem> requestItems)
+        public bool CreatePlan(List<PlanItem> requestItems)
         {
             int i = 0;
             List<PlanItem> items = requestItems.OrderBy(m => m.qiH).ThenBy(m => m.xuH).ThenBy(m => m.gongZLH).ToList();
 
             //初始化库存数据
-            if (!InitData(option))
+            if (!InitData())
             {
                 log.Error(string.Format($"Init Data Failed!\n"));
                 return false;
@@ -44,6 +48,14 @@ namespace BOM.Models
             foreach (PlanItem item in items)
             {
                 i++;
+                if (option == 2 || option == 4)//续排
+                {
+                    if (!GetPlanCount(item))
+                    {
+                        log.Error(string.Format($"获取续排次数失败\n"));
+                        return false;
+                    }
+                }
                 //初始化当前物料的BOM树
                 if (InitBomTree(item))
                 {
@@ -58,15 +70,21 @@ namespace BOM.Models
                 Calculate(i, item);
 
                 //处理当前记录，令号，期号，顺序号
-                if (!ProcessOrder(i, option, item))
+                if (!ProcessOrder(i, item))
                 {
                     log.Error(string.Format($"Process Order Failed!\n"));
+                    return false;
+                }
+
+                if (!HandlePlanFlag(item))
+                {
+                    log.Error(string.Format($"处理续排标志失败!\n"));
                     return false;
                 }
             }
 
             //更新上期库存量
-            if (!UpdatePAB(option))
+            if (!UpdatePAB())
             {
                 log.Error(string.Format($"Update PAB Failed!\n"));
                 return false;
@@ -77,7 +95,25 @@ namespace BOM.Models
         {
             return true;
         }
-        private bool InitData(int option)
+
+        private bool GetPlanCount(PlanItem item)
+        {
+            sql = $"select ciSh from switch where gongZLH='{item.gongZLH}' and qiH='{item.qiH}' and xuH={item.xuH}";
+            cmd.CommandText = sql;
+            try
+            {
+                var Count = Convert.ToInt32(cmd.ExecuteScalar());
+                //tableFlag=0时，续排登记缺件表1，PAB登记daefault._store1_,否则登记缺件表，PAB登记daefault._store_
+                tableFlag = Count % 2;  
+            }
+            catch (Exception e)
+            {
+                log.Error(string.Format($"select switch error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                return false;
+            }
+            return true;
+        }
+        private bool InitData()
         {
             SqlDataReader dataReader = null;
             stocks.Clear();
@@ -98,7 +134,21 @@ namespace BOM.Models
                             item.flag = 0;
                             item.wuLBM = Convert.ToInt64(dataReader["materielIdentfication"].ToString());   //物料编码
                             item.SOR = Convert.ToDecimal(dataReader["SR"].ToString());          //在途数量
-                            item.PAB = Convert.ToDecimal(dataReader["_STORE_"].ToString());     //上期库存数量
+                            if (option == 1 || option == 3)//重排
+                            {
+                                item.PAB = Convert.ToDecimal(dataReader["_STORE_"].ToString());     //上期库存数量
+                            }
+                            else
+                            {
+                                if (tableFlag == 0)
+                                {
+                                    item.PAB = Convert.ToDecimal(dataReader["_STORE_"].ToString());     //上期库存数量
+                                }
+                                else {
+                                    item.PAB = Convert.ToDecimal(dataReader["_STORE1_"].ToString());     //上期库存数量
+                                }
+                            }
+                            
                             item.SS = Convert.ToDecimal(dataReader["SS"].ToString());           //安全库存
                             item.LS = Convert.ToDecimal(dataReader["LS"].ToString());           //批量规则
                             item.shengChXSh = dataReader["SHENGCLX"].ToString();                //生产形式
@@ -149,7 +199,30 @@ namespace BOM.Models
             }
         }
 
-        private bool UpdatePAB(int option)
+        private bool HandlePlanFlag(PlanItem item)
+        {
+            if (option == 1 || option == 3 )//重排，预重排
+            {
+                sql = $"delete from switch where gongZLH='{item.gongZLH}' and qiH='{item.qiH}' and xuH={item.xuH} insert into switch (gongZLH, qiH, xuH, ciSh) value ('{item.gongZLH}', '{item.qiH}', {item.xuH}, 0)";
+                
+            }
+            else
+            {
+                sql = $"update switch set ciSh = ciSh + 1 where gongZLH='{item.gongZLH}' and qiH='{item.qiH}' and xuH={item.xuH}";
+            }
+            cmd.CommandText = sql;
+            try
+            {
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception e)
+            {
+                log.Error(string.Format($"update switch Error!\nsql[{sql}]\n"));
+                return false;
+            }
+            return true;
+        }
+        private bool UpdatePAB()
         {
             int iterator = 0;
             StringBuilder sb = new StringBuilder();
@@ -171,7 +244,13 @@ namespace BOM.Models
 
                 iterator++;
 
-                sb.Append($"UPDATE DeafaultAttr SET _Store_ = {item.PAB} WHERE materielIdentfication = {item.wuLBM} ");
+                var fieldName = "_STORE_";
+                if ((option == 2 || option == 4)&&tableFlag == 0)//重排
+                {
+                    fieldName = "_STORE1_";
+                }
+               
+                sb.Append($"UPDATE DeafaultAttr SET {fieldName} = {item.PAB} WHERE materielIdentfication = {item.wuLBM} ");
 
                 if (iterator % 1000 == 0)
                 {
@@ -268,7 +347,7 @@ namespace BOM.Models
             }
         }
 
-        private bool ProcessOrder(int i, int option, PlanItem item)
+        private bool ProcessOrder(int i, PlanItem item)
         {
             decimal POH = 0.00m;    //预计在库量
             decimal NR = 0.00m;    //净需求数量
@@ -303,14 +382,17 @@ namespace BOM.Models
                 stock.PAB = PORC + POH;
 
                 //所有的生产形式都要登记缺件表
-                if (option == 1 || option == 3)
+                if (option == 1 || option == 3)//重排
                 {
+                    
                     sql = $"delete from ullageTempSingle where gongZLH={item.gongZLH} and qiH={item.qiH} and wuLBM={stock.wuLBM} insert into ullageTempSingle (wuLBM, gongZLBSh, mingCh, guiG, tuH, shengChXSh, gongShSh, queJShL, qiH, jiHBB, chunJHQJ, gongZLH) values ({stock.wuLBM},'','','','',{stock.shengChXSh},0.00,{PORC},{item.qiH},'',0.00,{item.gongZLH})";
                 }
-                else//续排原来要求登记新的缺件表，旧表中的数据有什么用??没有直接覆盖就行，否则很难控制交替使用不同的表
+                else//续排
                 {
-                    sql = $"delete from ullageTempSingle where gongZLH={item.gongZLH} and qiH={item.qiH} and wuLBM={stock.wuLBM} insert into ullageTempSingle (wuLBM, gongZLBSh, mingCh, guiG, tuH, shengChXSh, gongShSh, queJShL, qiH, jiHBB, chunJHQJ, gongZLH) values ({stock.wuLBM},'','','','',{stock.shengChXSh},0.00,{PORC},{item.qiH},'',0.00,{item.gongZLH})";
+                    var tableName = (tableFlag == 0) ? "ullageTempSingle2" : "ullageTempSingle";
+                    sql = $"delete from {tableName} where gongZLH={item.gongZLH} and qiH={item.qiH} and wuLBM={stock.wuLBM} insert into {tableName} (wuLBM, gongZLBSh, mingCh, guiG, tuH, shengChXSh, gongShSh, queJShL, qiH, jiHBB, chunJHQJ, gongZLH) values ({stock.wuLBM},'','','','',{stock.shengChXSh},0.00,{PORC},{item.qiH},'',0.00,{item.gongZLH})";
                 }
+
                 cmd.CommandText = sql;
                 try
                 {

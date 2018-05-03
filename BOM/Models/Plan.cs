@@ -48,7 +48,7 @@ namespace BOM.Models
             foreach (PlanItem item in items)
             {
                 i++;
-                if (option == 2 || option == 4)//续排
+                if (option == 2)//续排
                 {
                     if (!GetPlanCount(item))
                     {
@@ -67,6 +67,8 @@ namespace BOM.Models
                     log.Error(string.Format($"数据检查失败，BOMID={item.wuLBM}\n"));
                     return false;
                 }
+
+                //遍历BOM树，将各物料所需的实际数量登记到stocks.shuL中
                 Calculate(i, item);
 
                 //处理当前记录，令号，期号，顺序号
@@ -76,18 +78,25 @@ namespace BOM.Models
                     return false;
                 }
 
-                if (!HandlePlanFlag(item))
+                //重排，续排才处理
+                if (option == 1 || option == 2)
                 {
-                    log.Error(string.Format($"处理续排标志失败!\n"));
-                    return false;
+                    if (!HandlePlanFlag(item))
+                    {
+                        log.Error(string.Format($"处理续排标志失败!\n"));
+                        return false;
+                    }
                 }
+
             }
 
             //更新上期库存量
-            if (!UpdatePAB())
-            {
-                log.Error(string.Format($"Update PAB Failed!\n"));
-                return false;
+            if (option == 1 || option == 2) { 
+                if (!UpdatePAB())
+                {
+                    log.Error(string.Format($"Update PAB Failed!\n"));
+                    return false;
+                }
             }
             return true;
         }
@@ -303,28 +312,30 @@ namespace BOM.Models
             return true;
         }
         /// <summary>
-        /// 计算单个物料的缺件信息和相关表单数据
+        /// 计算整个物料树各物料节点的实际需求数量，登记到stocks.shuL
         /// </summary>
         private void Calculate(int seqno, PlanItem item)
         {
-            decimal multiple = 0.00m;       //当前物料不足的数量
-            decimal surplus = 0.00m;        //上期剩余减去当前物料需要的数量后，剩余的数量
+            decimal multiple = 0.00m;       //当前物料不足的数量，也是其子物料需要乘以的倍数
+            decimal surplus = 0.00m;        //当前剩余物料的数量
 
-            //考虑替代物料??
+            
             var stock = stocks.Find(m => m.wuLBM == item.wuLBM);
             stock.flag = seqno;
-            surplus = stock.PAB - stock.shuL;
-            stock.shuL += item.shuL;
+            surplus = stock.PAB - stock.shuL;//当前剩余的数量
+            stock.shuL += item.shuL;//累计实际需要的数量
 
+            //当前剩余大于本次所需
             if (surplus - item.shuL > -0.00005m)
             {
                 return;
             }
 
+            //当前没有剩余
             if (surplus < 0.00005m)
             {
                 multiple = item.shuL;
-            }
+            }//当前有剩余，但不足本次所需
             else if (surplus - item.shuL < 0.00005m)
             {
                 multiple = item.shuL - surplus;
@@ -382,16 +393,28 @@ namespace BOM.Models
                 stock.PAB = PORC + POH;
 
                 //所有的生产形式都要登记缺件表
-                if (option == 1 || option == 3)//重排
+                var tableName = "";
+                switch (option)
                 {
+                    case 1://重排
+                        tableName = "ullageTempSingle";
+                        break;
+                    case 2://续拍
+                        tableName = (tableFlag == 0) ? "ullageTempSingle2" : "ullageTempSingle";
+                        break;
+                    case 3://预重排
+                        tableName = "ullageTempSingleTemp";
+                        break;
+                    case 4://预续排 
+                        tableName = "ullageTempSingleTemp2";
+                        break;
+                    default:
+                        break;
+                }
+
                     
-                    sql = $"delete from ullageTempSingle where gongZLH={item.gongZLH} and qiH={item.qiH} and wuLBM={stock.wuLBM} insert into ullageTempSingle (wuLBM, gongZLBSh, mingCh, guiG, tuH, shengChXSh, gongShSh, queJShL, qiH, jiHBB, chunJHQJ, gongZLH) values ({stock.wuLBM},'','','','',{stock.shengChXSh},0.00,{PORC},{item.qiH},'',0.00,{item.gongZLH})";
-                }
-                else//续排
-                {
-                    var tableName = (tableFlag == 0) ? "ullageTempSingle2" : "ullageTempSingle";
-                    sql = $"delete from {tableName} where gongZLH={item.gongZLH} and qiH={item.qiH} and wuLBM={stock.wuLBM} insert into {tableName} (wuLBM, gongZLBSh, mingCh, guiG, tuH, shengChXSh, gongShSh, queJShL, qiH, jiHBB, chunJHQJ, gongZLH) values ({stock.wuLBM},'','','','',{stock.shengChXSh},0.00,{PORC},{item.qiH},'',0.00,{item.gongZLH})";
-                }
+                sql = $"delete from {tableName} where gongZLH={item.gongZLH} and qiH={item.qiH} and wuLBM={stock.wuLBM} insert into {tableName} (wuLBM, gongZLBSh, mingCh, guiG, tuH, shengChXSh, gongShSh, queJShL, qiH, jiHBB, chunJHQJ, gongZLH) values ({stock.wuLBM},'','','','',{stock.shengChXSh},0.00,{PORC},{item.qiH},'',0.00,{item.gongZLH})";
+
 
                 cmd.CommandText = sql;
                 try
@@ -402,6 +425,11 @@ namespace BOM.Models
                 {
                     log.Error(string.Format($"update ullageTempSingle Error\nsql[{sql}]\nError[{e.StackTrace}]"));
                     return false;
+                }
+
+                if (option == 3 || option  == 4)
+                {
+                    return true;
                 }
 
                 switch (stock.shengChXSh)
@@ -783,7 +811,7 @@ namespace BOM.Models
                 }
                 else
                 {
-                    log.Error(string.Format($"查询BOM失败，SQL={sql}\n"));
+                    log.Error(string.Format($"未在BOM表中查到相关记录，SQL={sql}\n"));
                     return false;
                 }
             }

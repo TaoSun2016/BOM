@@ -16,8 +16,9 @@ namespace BOM.Controllers
 
         [HttpPost]
         [Route("Create")]
-        public void CreatePlan(int option, List<PlanItem> requestItems)
+        public void CreatePlan(PlanRequest request)
         {
+            //PlanRequest request = new PlanRequest();
             SqlConnection sqlConnection = DBConnection.OpenConnection();
             SqlCommand command = new SqlCommand();
 
@@ -25,9 +26,9 @@ namespace BOM.Controllers
             command.Connection = sqlConnection;
             command.Transaction = transaction;
 
-            Plan plan = new Plan(option, sqlConnection, command, transaction);
+            Plan plan = new Plan(request.option, sqlConnection, command, transaction);
 
-            if (!plan.CreatePlan(requestItems))
+            if (!plan.CreatePlan(request.requestItems))
             {
                 transaction.Rollback();
                 command.Dispose();
@@ -46,5 +47,10 @@ namespace BOM.Controllers
             command.Dispose();
             DBConnection.CloseConnection(sqlConnection);
         }
+    }
+    public class PlanRequest
+    {
+        public int option { get; set; }
+        public List<PlanItem> requestItems { get; set; }
     }
 }

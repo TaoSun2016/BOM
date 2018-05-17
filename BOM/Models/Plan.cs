@@ -126,6 +126,7 @@ namespace BOM.Models
         {
             SqlDataReader dataReader = null;
             stocks.Clear();
+            string tmp = "";
 
             //获取DeafaultAttr表中当前所有物料的参数
             using (SqlCommand cmd1 = new SqlCommand())
@@ -141,56 +142,54 @@ namespace BOM.Models
                         {
                             var item = new Stock();
                             item.flag = 0;
-                            item.wuLBM = Convert.ToInt64(dataReader["materielIdentfication"].ToString());   //物料编码
-                            item.SOR = Convert.ToDecimal(dataReader["SR"].ToString());          //在途数量
+
+                            tmp = dataReader["materielIdentfication"].ToString();
+                            item.wuLBM = Convert.ToInt64(tmp);   //物料编码
+
+                            tmp = dataReader["SR"].ToString();
+                            item.SOR = Convert.ToDecimal(tmp == string.Empty?"0.00":tmp);          //在途数量
+
                             if (option == 1 || option == 3)//重排
                             {
-                                item.PAB = Convert.ToDecimal(dataReader["_STORE_"].ToString());     //上期库存数量
+                                tmp = dataReader["_STORE_"].ToString();
+                                item.PAB = Convert.ToDecimal(tmp == string.Empty ? "0.00" : tmp);     //上期库存数量
                             }
                             else
                             {
                                 if (tableFlag == 0)
                                 {
-                                    item.PAB = Convert.ToDecimal(dataReader["_STORE_"].ToString());     //上期库存数量
+                                    tmp = dataReader["_STORE_"].ToString();
+                                    item.PAB = Convert.ToDecimal(tmp == string.Empty ? "0.00" : tmp);     //上期库存数量
                                 }
                                 else {
-                                    item.PAB = Convert.ToDecimal(dataReader["_STORE1_"].ToString());     //上期库存数量
+                                    tmp = dataReader["_STORE1_"].ToString();
+                                    item.PAB = Convert.ToDecimal(tmp == string.Empty ? "0.00" : tmp);     //上期库存数量
                                 }
                             }
-                            
-                            item.SS = Convert.ToDecimal(dataReader["SS"].ToString());           //安全库存
-                            item.LS = Convert.ToDecimal(dataReader["LS"].ToString());           //批量规则
+
+                            tmp = dataReader["SS"].ToString();
+                            item.SS = Convert.ToDecimal(tmp == string.Empty ? "0.00": tmp);           //安全库存
+
+                            tmp = dataReader["LS"].ToString();
+                            item.LS = Convert.ToDecimal(tmp == string.Empty ? "0.00" : tmp);           //批量规则
+
                             item.shengChXSh = dataReader["SHENGCLX"].ToString();                //生产形式
-                            item.touLBSh = Convert.ToInt64(dataReader["touLBSh"].ToString());   //投料标识
+
+                            tmp = dataReader["touLBSh"].ToString();
+                            item.touLBSh = Convert.ToInt64(tmp == string.Empty?"0": tmp);   //投料标识
+
                             item.zum = dataReader["zum"].ToString();                            //工序号
                             item.tuhao = dataReader["tuhao"].ToString();                            //图号
                             item.guige = dataReader["guige"].ToString();                            //规格
 
                             item.OH = 0.00m;                                                //获取在库数量OH
 
-                            sql = $"select sum(kuCSh) from kuCShJB001 where wuLBM = {item.wuLBM}";
-                            cmd1.CommandText = sql;
-                            cmd1.Connection = connection;
-                            try
-                            {
-                                item.OH = Convert.ToDecimal(cmd.ExecuteScalar());
-                            }
-                            catch (Exception e)
-                            {
-                                log.Error(string.Format($"Get OH error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                                return false;
-                            }
-
-                            if (option == 1 || option == 3)//重排，预重排
-                            {
-                                item.PAB = item.SOR + item.OH;
-                            }
                             stocks.Add(item);
                         }
                     }
                     else
                     {
-                        log.Error(string.Format($"Select DeafaultAttr error!\nsql[{sql}]\nError"));
+                        log.Error(string.Format($"表DeafaultAttr中没有记录r!\nsql[{sql}]\nError"));
                         return false;
                     }
                 }
@@ -202,6 +201,29 @@ namespace BOM.Models
                 finally
                 {
                     dataReader.Close();
+                }
+
+                foreach (var item in stocks)
+                {
+
+                    sql = $"select sum(kuCSh) from kuCShJB001 where wuLBM = {item.wuLBM}";
+                    cmd.CommandText = sql;
+                    cmd.Connection = connection;
+                    try
+                    {
+                        tmp = cmd.ExecuteScalar().ToString();
+                        item.OH = Convert.ToDecimal(tmp == string.Empty ? "0.00" : tmp);
+                    }
+                    catch (Exception e)
+                    {
+                        log.Error(string.Format($"获取在库数量OH Error!\nsql[{sql}]\nError[{e.StackTrace}]\nMessage[{e.Message}]"));
+                        return false;
+                    }
+
+                    if (option == 1 || option == 3)//重排，预重排
+                    {
+                        item.PAB = item.SOR + item.OH;
+                    }
                 }
 
                 return true;

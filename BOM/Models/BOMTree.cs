@@ -27,15 +27,15 @@ namespace BOM.Models
 
 
 
-        //Open BOM Tree
-        //测试暂时将tmpid设为string型
-        public void FindChildrenTree(SqlConnection connection, ref List<NodeInfo> list, string pTmpid, int prlSeqNo, string tmpId, int rlSeqNo, int level)
+        //展开BOM数
+        //根据上送父子模板编码，将子模板下的所有子孙模板信息，包括属性信息生成nodeinfo数组返回前台
+        public void FindChildrenTree(SqlConnection connection, ref List<NodeInfo> list, long pTmpid, int prlSeqNo, long tmpId, int rlSeqNo, int level)
         {
             string sql = null;
             NodeInfo nodeInfo = new NodeInfo();
             nodeInfo.Attributes = new List<TempletAttribute>();
 
-            List<string> listCTmpId = new List<string>();
+            List<long> listCTmpId = new List<long>();
             List<int> listSeqNo = new List<int>();
 
             SqlDataReader dataReader = null;
@@ -43,8 +43,9 @@ namespace BOM.Models
             using (SqlCommand command = new SqlCommand())
             {
                 command.Connection = connection;
-                //sql = $"SELECT TmpNm FROM TmpInfo WHERE TmpId = {tmpId}"';
-                sql = $"SELECT TmpNm FROM TmpInfo WHERE TmpId = '{tmpId}'";
+
+                //获取当前模板名称
+                sql = $"SELECT TmpNm FROM TmpInfo WHERE TmpId = {tmpId}";
                 command.CommandText = sql;
 
                 try
@@ -52,6 +53,7 @@ namespace BOM.Models
                     dataReader = command.ExecuteReader();
                     if (dataReader.HasRows)
                     {
+                        //根据模板信息形成节点信息nodeInfo
                         dataReader.Read();
                         nodeInfo.NodeLevel = level;
                         nodeInfo.PTmpId = pTmpid;
@@ -74,9 +76,9 @@ namespace BOM.Models
                     throw;
                 }
 
-                //Flag :0 default attribute 1 private attribute
-                //sql = $"SELECT CASE TmpId WHEN 0 THEN 0 ELSE 1 END AS Flag, AttrId, AttrNm, AttrTp FROM AttrDefine WHERE TmpId = {tmpId} or TmpId = 0";
-                sql = $"SELECT CASE TmpId WHEN '0' THEN '0' ELSE '1' END AS Flag, AttrId, AttrNm, AttrTp FROM AttrDefine WHERE TmpId = '{tmpId}' or TmpId = '0' AND LockFlag = '1' ORDER BY FLAG, AttrId";
+                //获取当前模板的所有属性
+                //Flag :0 缺省属性 1 私有属性
+                sql = $"SELECT CASE TmpId WHEN 0 THEN 0 ELSE 1 END AS Flag, AttrId, AttrNm, AttrTp FROM AttrDefine WHERE TmpId = {tmpId} or TmpId = 0 AND LockFlag = '1' ORDER BY FLAG, AttrId";
                 command.CommandText = sql;
 
                 try
@@ -85,20 +87,30 @@ namespace BOM.Models
                     while (dataReader.Read())
                     {
 
-                        nodeInfo.Attributes.Add(new TempletAttribute { Flag = dataReader["Flag"].ToString(), Id = dataReader["AttrId"].ToString(), Name = dataReader["AttrNm"].ToString(), Type = dataReader["AttrTp"].ToString(), Values = new List<string>() });
+                        nodeInfo.Attributes.Add(new TempletAttribute {
+                                                        Flag = dataReader["Flag"].ToString(),
+                                                        Id = dataReader["AttrId"].ToString(),
+                                                        Name = dataReader["AttrNm"].ToString(),
+                                                        Type = dataReader["AttrTp"].ToString(),
+                                                        Values = new List<string>()
+                                                     }
+                                                );
                     }
                 }
                 catch (Exception e)
                 {
                     log.Error(string.Format($"Select AttrDefine error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                    dataReader.Close();
                     throw;
                 }
-                dataReader.Close();
+                finally
+                {
+                    dataReader.Close();
+                }
+                
                 list.Add(nodeInfo);
 
-                //sql = $"SELECT CTmpId, rlSeqNo FROM Relation WHERE TmpId = {tmpId} ORDER BY CTmpId, rlSeqNo";
-                sql = $"SELECT CTmpId, rlSeqNo FROM Relation WHERE TmpId = '{tmpId}' AND LockFlag = '1' ORDER BY CTmpId, rlSeqNo";
+                //获取当前模板的子模板
+                sql = $"SELECT CTmpId, rlSeqNo FROM Relation WHERE TmpId = {tmpId}  AND LockFlag = '1' ORDER BY CTmpId, rlSeqNo";
                 command.CommandText = sql;
 
                 try
@@ -111,10 +123,9 @@ namespace BOM.Models
                     }
                     else
                     {
-
                         while (dataReader.Read())
                         {
-                            listCTmpId.Add(dataReader["CTmpId"].ToString());
+                            listCTmpId.Add(Convert.ToInt64(dataReader["CTmpId"].ToString()));
                             listSeqNo.Add(Convert.ToInt32(dataReader["rlSeqNo"].ToString()));
 
                         }
@@ -129,6 +140,7 @@ namespace BOM.Models
                     throw;
                 }
 
+                //循环递归遍历子模板，登记节点信息
                 for (int i = 0; i < listCTmpId.Count(); i++)
                 {
                     FindChildrenTree(connection, ref list, tmpId, rlSeqNo, listCTmpId[i], listSeqNo[i], level + 1);
@@ -137,28 +149,33 @@ namespace BOM.Models
 
         }
 
+        //申请编码
+        //将前台上送节点信息登记私有属性表和缺省属性表
         public string ApplyCode(NodeInfo nodeInfo)
         {
             int result = -1;
             bool hasPrivateAttribute = false;
             string materielIdentification = null;
             string sql = null;
+
             StringBuilder insertBuilder = new StringBuilder($"INSERT INTO {nodeInfo.TmpId} (");
             StringBuilder insertValues = new StringBuilder($" ) VALUES (");
             SqlConnection sqlConnection = DBConnection.OpenConnection();
             SqlTransaction sqlTransaction = sqlConnection.BeginTransaction();
             SqlDataReader dataReader = null;
+
             using (SqlCommand command = new SqlCommand())
             {
                 command.Connection = sqlConnection;
                 command.Transaction = sqlTransaction;
 
-                //If nodeInfo has private attribute
+                //当前节点是否有私有属性
                 hasPrivateAttribute = nodeInfo.Attributes.Where(m => m.Flag == "1").Count() > 0;
+
                 if (hasPrivateAttribute)
                 {
-                    //Check if the private attribute table exists
-                    sql = $"SELECT COUNT(*) FROM SYSOBJECTS WHERE NAME = '{nodeInfo.TmpId}' ";
+                    //检查该模板的私有属性表是否存在，表名和模板号相同
+                    sql = $"SELECT COUNT(*) FROM SYSOBJECTS WHERE NAME = '{nodeInfo.TmpId}' AND TYPE = 'U'";
                     command.CommandText = sql;
                     try
                     {
@@ -177,7 +194,7 @@ namespace BOM.Models
                         throw new Exception($"Table {nodeInfo.TmpId} doesn't exsit!!");
                     }
 
-                    //Check duplicated records
+                    //检查当前私有属性的值是否已存在，存在则报错
                     StringBuilder builder = new StringBuilder($"SELECT COUNT(*) FROM {nodeInfo.TmpId} WHERE");
 
                     int counter = 0;
@@ -224,8 +241,8 @@ namespace BOM.Models
                     }
                 }
 
-                //Get Materiel Identification
-
+                
+                //生成物料编码
                 sql = $"SELECT NEXT_NO FROM SEQ_NO WHERE Ind_Key = '{nodeInfo.TmpId}'";
 
                 try
@@ -272,10 +289,10 @@ namespace BOM.Models
                     throw;
                 }
 
-                //Register private attribute values
+                //登记私有属性表
                 if (hasPrivateAttribute)
                 {
-                    sql = insertBuilder.ToString() + $" materielIdentfication" + insertValues.ToString() + $" '{materielIdentification}')";
+                    sql = insertBuilder.ToString() + $" materielIdentfication" + insertValues.ToString() + $" {materielIdentification})";
 
                     command.CommandText = sql;
                     try
@@ -298,10 +315,11 @@ namespace BOM.Models
                     }
                 }
 
-                //Register default attribute values
+                //登记缺省属性表
                 //前台必须给所有的缺省属性赋值,没有值赋缺省值
                 insertBuilder = new StringBuilder($"INSERT INTO DeafaultAttr (");
                 insertValues = new StringBuilder($" ) VALUES (");
+
                 var defaultAttributes = nodeInfo.Attributes.Where(m => m.Flag == "0");
                 foreach (var defaultAttrbute in defaultAttributes)
                 {
@@ -315,7 +333,7 @@ namespace BOM.Models
                         insertValues.Append($" {defaultAttrbute.Values[0]},");
                     }
                 }
-                sql = insertBuilder.ToString() + $" materielIdentfication" + insertValues.ToString() + $" '{materielIdentification}')";
+                sql = insertBuilder.ToString() + $" materielIdentfication" + insertValues.ToString() + $" {materielIdentification})";
 
                 command.CommandText = sql;
                 try
@@ -1355,24 +1373,24 @@ namespace BOM.Models
     public class NodeInfo
     {
         public int NodeLevel { get; set; }
-        public string PTmpId { get; set; }
-        public string pMaterielId { get; set; }
+        public long PTmpId { get; set; }
+        public long pMaterielId { get; set; }
         public int PrlSeqNo { get; set; }
-        public string TmpId { get; set; }
+        public long TmpId { get; set; }
         public string TmpNm { get; set; }
-        public string MaterielId { get; set; }
+        public long MaterielId { get; set; }
         public int rlSeqNo { get; set; }
         public decimal Count { get; set; }
         public List<TempletAttribute> Attributes { get; set; }
         public NodeInfo()
         {
             NodeLevel = 0;
-            PTmpId = "";
-            pMaterielId = "";
+            PTmpId = 0;
+            pMaterielId = 0;
             PrlSeqNo = 0;
-            TmpId = "";
+            TmpId = 0;
             TmpNm = "";
-            MaterielId = "";
+            MaterielId = 0;
             rlSeqNo = 0;
             Count = 0.00m;
             Attributes = new List<TempletAttribute>();

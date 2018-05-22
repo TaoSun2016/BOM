@@ -97,9 +97,10 @@ namespace BOM.Controllers
         {
             SqlConnection sqlConnection = DBConnection.OpenConnection();
             SqlCommand command = new SqlCommand();
-
             SqlTransaction transaction = sqlConnection.BeginTransaction();
+
             List<NodeInfo> list = new List<NodeInfo>();
+
             command.Connection = sqlConnection;
             command.Transaction = transaction;
 

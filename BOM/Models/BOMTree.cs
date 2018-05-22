@@ -396,22 +396,24 @@ namespace BOM.Models
         }
 
 
+        //根据前台上送节点信息和模板生成模板树
         public void CreateBOMTree(ref List<NodeInfo> list, NodeInfo node)
         {
             bool uniqFlag = false;
             string sql = null;
             StringBuilder stringBuilder = new StringBuilder();
+        
 
-            NodeInfo child = null;
-            List<string> listCtmpId = new List<string>();
+            NodeInfo child = new NodeInfo();
+            List<long> listCtmpId = new List<long>();
             List<int> listSeqNo = new List<int>();
 
             SqlDataReader reader = null;
 
-            //如果有物料编码则直接登记节点信息,遍历其下子节点
-            if (string.IsNullOrEmpty(node.MaterielId.Trim()))
+            //如果没有上送物料编码
+            if (node.MaterielId == 0L)
             {
-                //判断属性取值是否唯一
+                //判断当前节点所有属性的取值是否唯一
                 uniqFlag = true;
                 foreach (var attribute in node.Attributes)
                 {
@@ -425,9 +427,9 @@ namespace BOM.Models
                 //属性取值唯一则尝试根据属性取值获取物料编码
                 if (uniqFlag)
                 {
-                    List<string> materielIdList = new List<string>();
+                    List<long> materielIdList = new List<long>();
                     stringBuilder.Clear();
-                    stringBuilder.Append($"SELECT ISNULL(materielIdentfication,'NULL')  AS ID FROM {node.TmpId} WHERE 1 = 1");
+                    stringBuilder.Append($"SELECT ISNULL(materielIdentfication,0)  AS ID FROM {node.TmpId} WHERE 1 = 1");
                     foreach (var attribute in node.Attributes.Where(m => m.Flag == "1"))
                     {
                         var value = (attribute.Type == "C") ? ("'" + attribute.Values[0].Trim() + "'") : attribute.Values[0].Trim();
@@ -441,23 +443,24 @@ namespace BOM.Models
                         while (reader.Read())
                         {
 
-                            materielIdList.Add(reader["ID"].ToString());
+                            materielIdList.Add(Convert.ToInt64(reader["ID"].ToString()));
                         }
                         reader.Close();
+
                         if (materielIdList.Count == 1)
                         {
                             node.MaterielId = materielIdList[0];
                         }
                         else if (materielIdList.Count > 1)
                         {
-                            node.MaterielId = "MultipleMateriels";
+                            node.MaterielId = 999999999L;
                             list.Add(node);
                             return;
                         }
                     }
                     catch (Exception e)
                     {
-                        log.Error(string.Format($"Select AttrDefine error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                        log.Error(string.Format($"根据私有属性获取物料编码出错!\nsql[{sql}]\nError[{e.StackTrace}]"));
                         reader.Close();
                         throw;
                     }
@@ -466,16 +469,19 @@ namespace BOM.Models
                 else
                 {
                     //属性取值不唯一则登记节点并停止该节点以后的遍历
-                    node.MaterielId = "MultiplePropertyValues";
+                    node.MaterielId = 88888888L;
                     list.Add(node);
                     return;
                 }
             }
            
+            //如果此处物料编码仍为0,则返回0作为物料编码
            
+            //登记当前节点到节点列表
             list.Add(node);
 
-            sql = $"SELECT CTmpId, rlSeqNo　FROM RELATION WHERE TmpId = '{node.TmpId}' and LockFlag = 1 ORDER BY CTmpId, rlSeqNo";
+            //获取当前节点的所有子模板信息
+            sql = $"SELECT CTmpId, rlSeqNo　FROM RELATION WHERE TmpId = {node.TmpId} and LockFlag = 1 ORDER BY CTmpId, rlSeqNo";
             command.CommandText = sql;
 
             reader = command.ExecuteReader();
@@ -486,7 +492,7 @@ namespace BOM.Models
                 while (reader.Read())
                 {
                     //生成子节点数据
-                    listCtmpId.Add(reader["CTmpId"].ToString());
+                    listCtmpId.Add(Convert.ToInt64(reader["CTmpId"].ToString()));
                     listSeqNo.Add((int)reader["rlSeqNo"]);
 
                 }
@@ -494,12 +500,12 @@ namespace BOM.Models
 
                 for (int i = 0; i < listCtmpId.Count; i++)
                 {
-                    string cTmpId = listCtmpId[i];
+                    long cTmpId = listCtmpId[i];
                     int cSeqNo = listSeqNo[i];
                     child = new NodeInfo();
 
                     //查询子节点模板信息,部分子节点属性赋值
-                    sql = $"SELECT TmpNm FROM TmpInfo WHERE TmpId = '{cTmpId}'";
+                    sql = $"SELECT TmpNm FROM TmpInfo WHERE TmpId = {cTmpId}";
                     command.CommandText = sql;
 
                     try
@@ -532,9 +538,8 @@ namespace BOM.Models
                     }
 
                     //获取子节点属性定义
-                    //Flag :0 default attribute 1 private attribute
-                    //sql = $"SELECT CASE TmpId WHEN 0 THEN 0 ELSE 1 END AS Flag, AttrId, AttrNm, AttrTp FROM AttrDefine WHERE TmpId = {tmpId} or TmpId = 0";
-                    sql = $"SELECT CASE TmpId WHEN '0' THEN '0' ELSE '1' END AS Flag, AttrId, AttrNm, AttrTp FROM AttrDefine WHERE TmpId = '{cTmpId}' or TmpId = '0'  AND LockFlag = '1' ORDER BY FLAG, AttrId";
+                    //Flag :0 缺省属性 1 私有属性
+                    sql = $"SELECT CASE TmpId WHEN 0 THEN '0' ELSE '1' END AS Flag, AttrId, AttrNm, AttrTp FROM AttrDefine WHERE TmpId = {cTmpId} or TmpId = 0 AND LockFlag = '1' ORDER BY FLAG, AttrId";
                     command.CommandText = sql;
 
                     try
@@ -543,7 +548,12 @@ namespace BOM.Models
                         while (reader.Read())
                         {
 
-                            child.Attributes.Add(new TempletAttribute { Flag = reader["Flag"].ToString().Trim(), Id = reader["AttrId"].ToString().Trim(), Name = reader["AttrNm"].ToString().Trim(), Type = reader["AttrTp"].ToString().Trim(), Values = new List<string>() });
+                            child.Attributes.Add(new TempletAttribute {
+                                                        Flag = reader["Flag"].ToString().Trim(),
+                                                        Id = reader["AttrId"].ToString().Trim(),
+                                                        Name = reader["AttrNm"].ToString().Trim(),
+                                                        Type = reader["AttrTp"].ToString().Trim(),
+                                                        Values = new List<string>() });
                         }
                         reader.Close();
                     }
@@ -554,7 +564,7 @@ namespace BOM.Models
                         throw;
                     }
 
-                    //获取子节点属性值
+                    //根据当前节点数据获取其子节点属性值
                     GetChildAttributeValues(node, child);
                     CreateBOMTree(ref list, child);
                 }
@@ -569,8 +579,8 @@ namespace BOM.Models
 
         public void GetChildAttributeValues(NodeInfo pNode, NodeInfo cNode)
         {
-            int valueTpCount = 0;
-            string origValueType = "";
+            int valueTpCount = 0;       //规则计数器
+            string origValueType = "";  //上一规则编号
 
             string cAttrId = "";
             string CAttrType = "";
@@ -584,29 +594,30 @@ namespace BOM.Models
             string gteq = "";
             string lteq = "";
 
-            List<AttrPass> relationList = new List<AttrPass>();
+            List<AttrPass> relationList = new List<AttrPass>();     //某一属性的所有计算规则
             List<string> values = new List<string>();
             List<string> midValues = new List<string>();
 
             string sql = "";
             string defaultValue = "";
-            bool verified = true; //同样Valuetype的记录,如果上一条验证通过则为true,有一条验证不过就是false.
-            bool found = false; //是否找到匹配记录
+            bool verified = true;   //同样Valuetype的记录,如果上一条验证通过则为true,有一条验证不过就是false.
+            bool found = false;     //是否找到匹配记录
             int foundNum = 0;
 
             //逐个计算子节点属性值
             foreach (var attribute in cNode.Attributes)
             {
-
-                sql = $"SELECT CAttrID,CAttrValue,ValueTp,PAttrId,Gt,Lt,Eq,Excld,Gteq,Lteq FROM AttrPass WHERE TmpId = '{pNode.TmpId}' and CTmpId = '{cNode.TmpId}' AND rlSeqNo = {cNode.rlSeqNo} AND CAttrId = '{attribute.Id}' ORDER BY ValueTp";
+                //获取当前属性与父模板的关系定义
+                sql = $"SELECT CAttrID,CAttrValue,ValueTp,PAttrId,Gt,Lt,Eq,Excld,Gteq,Lteq FROM AttrPass WHERE TmpId = {pNode.TmpId} and CTmpId = {cNode.TmpId} AND rlSeqNo = {cNode.rlSeqNo} AND CAttrId = '{attribute.Id}' ORDER BY ValueTp";
                 command.CommandText = sql;
 
                 values.Clear();
                 relationList.Clear();
-                SqlDataReader reader = command.ExecuteReader();
 
+                SqlDataReader reader = command.ExecuteReader();
                 if (reader.HasRows)
                 {
+                    //将子节点当前属性的关系定义读取到列表中
                     while (reader.Read())
                     {
                         relationList.Add(new AttrPass
@@ -626,10 +637,13 @@ namespace BOM.Models
 
                     }
                     reader.Close();
+
                     verified = true;
                     midValues.Clear();
                     origValueType = "";
                     valueTpCount = 0;
+
+                    //遍历当前属性关系定义，确定取值
                     foreach (var attrPass in relationList)
                     {
                         cAttrId = attrPass.CAttrId;
@@ -657,7 +671,7 @@ namespace BOM.Models
                             origValueType = valueType;
                         }
 
-                        //属性的缺省值,在此循环中只保留值,不作处理
+                        //属性的缺省值,在此次循环中只保留值,然后进入下一循环，不作其他处理
                         if (valueType == "0")
                         {
                             defaultValue = CalculateAttrbuteValue(pNode, CAttrType, cAttrValue);
@@ -675,13 +689,14 @@ namespace BOM.Models
 
                         //获取父属性信息
                         var attr = pNode.Attributes.Find(m => m.Id.Trim() == pAttrId);
-                        //父属性是字符型,字符型只判断相等和不等
+
+                        //父属性是字符型,字符型只判断相等(eq)和不等(excld)
                         if (attr.Type == "C")
                         {
                             foundNum = 0;
                             foreach (var pValue in attr.Values)
                             {
-                                //检查是否满足Excld的情况
+                                //检查是否满足Excld的情况：父属性不能取excld字段中的值
                                 if (!string.IsNullOrEmpty(excld) && excld != "NULL")
                                 {
                                     found = false;
@@ -701,7 +716,7 @@ namespace BOM.Models
                                     }
                                 }
 
-                                //判断是否满足相等的情况
+                                //判断是否满足相等的情况，即判断父属性的值是否与eq字段中的值相等
                                 if (!string.IsNullOrEmpty(eq) && eq != "NULL")
                                 {
                                     found = false;  //true表示找到相等的值
@@ -729,7 +744,7 @@ namespace BOM.Models
                                 continue;
                             }
                         }
-                        else//父属性是数字型,数字型需要判断相等,不等和大于小于
+                        else//父属性是数字型,数字型需要判断相等(eq),不等(excld)和大于(gt)小于(lt)
                         {
                             foundNum = 0;
                             foreach (var pValue in attr.Values)
@@ -744,26 +759,27 @@ namespace BOM.Models
                                     foreach (var element in valueArray)
                                     {
 
-                                        if (Math.Abs(pAttrValue - Convert.ToDecimal(element)) < 0.005m)
+                                        if (Math.Abs(pAttrValue - Convert.ToDecimal(element)) < 0.00005m)
                                         {
                                             found = true; ;
                                             break;
                                         }
                                     }
+
                                     if (found)
                                     {
                                         continue;
                                     }
                                 }
 
-                                //检查是否满足相等情况,满足即可进入下一轮循环,不满足在判断大于和小于的情况
+                                //检查是否满足相等情况,满足即可进入下一轮循环,不满足再判断大于和小于的情况
                                 if (!string.IsNullOrEmpty(eq) && eq != "NULL")
                                 {
                                     found = false;
                                     var valueArray = eq.Split(',');
                                     foreach (var element in valueArray)
                                     {
-                                        if (Math.Abs(pAttrValue - Convert.ToDecimal(element)) < 0.005m)
+                                        if (Math.Abs(pAttrValue - Convert.ToDecimal(element)) < 0.00005m)
                                         {
                                             found = true;
                                             break;
@@ -793,7 +809,7 @@ namespace BOM.Models
                                         //gteq == "1' 表示使用>=判断gt的值,否则使用>判断gt的值. lteq同样处理
                                         if (gteq == "1") //pAttrValue >= gtValue
                                         {
-                                            if (pAttrValue - gtValue > -0.005m)
+                                            if (pAttrValue - gtValue > -0.00005m)
                                             {
                                                 //found = true;
                                             }
@@ -804,7 +820,7 @@ namespace BOM.Models
                                         }
                                         else  //pAttrValue > gtValue
                                         {
-                                            if (pAttrValue - gtValue > 0)
+                                            if (pAttrValue - gtValue > 0.00005m)
                                             {
                                                 //found = true;
                                             }
@@ -816,7 +832,7 @@ namespace BOM.Models
 
                                         if (lteq == "1") //pAttrValue <= ltValue
                                         {
-                                            if (pAttrValue - gtValue < 0.005m)
+                                            if (pAttrValue - ltValue < 0.00005m)
                                             {
                                                 //found = true;
                                             }
@@ -827,7 +843,7 @@ namespace BOM.Models
                                         }
                                         else  //pAttrValue < ltValue
                                         {
-                                            if (pAttrValue - gtValue < 0)
+                                            if (pAttrValue - ltValue < -0.00005m)
                                             {
                                                 //found = true;
                                             }
@@ -848,7 +864,7 @@ namespace BOM.Models
                                     {
                                         if (gteq == "1") //pAttrValue >= gtValue
                                         {
-                                            if (pAttrValue - gtValue > -0.005m)
+                                            if (pAttrValue - gtValue > -0.00005m)
                                             {
                                                 //found = true;
                                             }
@@ -859,7 +875,7 @@ namespace BOM.Models
                                         }
                                         else  //pAttrValue > gtValue
                                         {
-                                            if (pAttrValue - gtValue > 0)
+                                            if (pAttrValue - gtValue > 0.00005m)
                                             {
                                                 //found = true;
                                             }
@@ -877,7 +893,7 @@ namespace BOM.Models
 
                                         if (lteq == "1") //pAttrValue <= ltValue
                                         {
-                                            if (pAttrValue - gtValue < 0.005m)
+                                            if (pAttrValue - ltValue < 0.00005m)
                                             {
                                                 //found = true;
                                             }
@@ -888,7 +904,7 @@ namespace BOM.Models
                                         }
                                         else  //pAttrValue < ltValue
                                         {
-                                            if (pAttrValue - gtValue < 0)
+                                            if (pAttrValue - ltValue < -0.00005m)
                                             {
                                                 //found = true;
                                             }
@@ -916,7 +932,7 @@ namespace BOM.Models
 
                                         if (gteq == "1") //pAttrValue >= gtValue
                                         {
-                                            if (pAttrValue - gtValue > -0.005m)
+                                            if (pAttrValue - gtValue > -0.00005m)
                                             {
                                                 found = true;
                                             }
@@ -927,7 +943,7 @@ namespace BOM.Models
                                         }
                                         else  //pAttrValue > gtValue
                                         {
-                                            if (pAttrValue - gtValue > 0)
+                                            if (pAttrValue - gtValue > 0.00005m)
                                             {
                                                 found = true;
                                             }
@@ -950,7 +966,7 @@ namespace BOM.Models
 
                                         if (lteq == "1") //pAttrValue <= ltValue
                                         {
-                                            if (pAttrValue - ltValue < 0.005m)
+                                            if (pAttrValue - ltValue < 0.00005m)
                                             {
                                                 found = true;
                                             }
@@ -961,7 +977,7 @@ namespace BOM.Models
                                         }
                                         else  //pAttrValue < ltValue
                                         {
-                                            if (pAttrValue - ltValue < 0)
+                                            if (pAttrValue - ltValue < -0.00005m)
                                             {
                                                 found = true;
                                             }
@@ -1004,6 +1020,7 @@ namespace BOM.Models
                     }
                 }
                 else {
+                    //如果找不到属性关系定义，则不赋值
                     reader.Close();
                 }
             }

@@ -1098,14 +1098,14 @@ namespace BOM.Models
             SqlDataReader dataReader = null;
 
             //如果节点没有物料编码则生成
-            if (string.IsNullOrEmpty(node.MaterielId))
+            if (node.MaterielId == null || node.MaterielId == 0)
             {
-                //If nodeInfo has private attribute
+                //节点是否含有私有属性
                 hasPrivateAttribute = node.Attributes.Where(m => m.Flag == "1").Count() > 0;
                 if (hasPrivateAttribute)
                 {
-                    //Check if the private attribute table exists
-                    sql = $"SELECT COUNT(*) FROM SYSOBJECTS WHERE NAME = '{node.TmpId}' ";
+                    //检查私有属性表是否存在，不存在则报错
+                    sql = $"SELECT COUNT(*) FROM SYSOBJECTS WHERE NAME = {node.TmpId} ";
                     command.CommandText = sql;
                     try
                     {
@@ -1122,7 +1122,7 @@ namespace BOM.Models
                         throw new Exception($"Table {node.TmpId} doesn't exsit!!");
                     }
 
-                    //Check duplicated records
+                    //如果有私有属性表，则登记当前私有属性到表中
                     StringBuilder builder = new StringBuilder($"SELECT COUNT(*) FROM {node.TmpId} WHERE");
                     StringBuilder mIdBuilder = new StringBuilder($"SELECT materielIdentfication FROM {node.TmpId} WHERE");
 
@@ -1163,7 +1163,7 @@ namespace BOM.Models
                         log.Error(string.Format($"Select private attribute Error!\nsql[{sql}]\nError[{e.StackTrace}]"));
                         throw;
                     }
-                    //找不到,则新生成物料编码
+                    //根据私有属性找不到记录,则新生成物料编码，并登记私有属性
                     if (result == 0)
                     {
                         //Get Materiel Identification
@@ -1201,14 +1201,17 @@ namespace BOM.Models
                         {
                             log.Error($"Get MaterielIdentification Error,TmpID=[{node.TmpId}]sql=[{sql}]error[{e.StackTrace}][{e}][{e.Message}]");
                             dataReader.Close();
-
                             throw;
                         }
+                        finally
+                        {
+                            dataReader?.Close();
+                        }
 
-                        //Register private attribute values
+                        //登记私有属性
                         if (hasPrivateAttribute)
                         {
-                            sql = insertBuilder.ToString() + $" materielIdentfication" + insertValues.ToString() + $" '{materielIdentification}')";
+                            sql = insertBuilder.ToString() + $" materielIdentfication" + insertValues.ToString() + $" {materielIdentification})";
 
                             command.CommandText = sql;
                             try
@@ -1217,22 +1220,23 @@ namespace BOM.Models
                             }
                             catch (Exception e)
                             {
-                                log.Error(string.Format($"Register private attribute Error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                                log.Error(string.Format($"登记私有属性失败!\nsql[{sql}]\nError[{e.StackTrace}]"));
 
                                 throw;
                             }
                             if (result == 0)
                             {
-                                log.Error(string.Format($"No private attrbutes is registered!\nsql[{sql}]\n"));
+                                log.Error(string.Format($"没有私有属性被登记!\nsql[{sql}]\n"));
 
-                                throw new Exception("No private attrbutes is registered!");
+                                throw new Exception("没有私有属性被登记!");
                             }
                         }
 
-                        //Register default attribute values
+                        //登记缺省属性
                         //前台必须给所有的缺省属性赋值,没有值赋缺省值
                         insertBuilder = new StringBuilder($"INSERT INTO DeafaultAttr (");
                         insertValues = new StringBuilder($" ) VALUES (");
+
                         var defaultAttributes = node.Attributes.Where(m => m.Flag == "0");
                         foreach (var defaultAttrbute in defaultAttributes)
                         {
@@ -1246,7 +1250,7 @@ namespace BOM.Models
                                 insertValues.Append($" {defaultAttrbute.Values[0]},");
                             }
                         }
-                        sql = insertBuilder.ToString() + $" materielIdentfication" + insertValues.ToString() + $" '{materielIdentification}')";
+                        sql = insertBuilder.ToString() + $" materielIdentfication" + insertValues.ToString() + $" {materielIdentification})";
 
                         command.CommandText = sql;
                         try
@@ -1255,16 +1259,16 @@ namespace BOM.Models
                         }
                         catch (Exception e)
                         {
-                            log.Error(string.Format($"Register default attribute Error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                            log.Error(string.Format($"登记缺省属性表出错!\nsql[{sql}]\nError[{e.StackTrace}]"));
                             throw;
                         }
                         if (result == 0)
                         {
-                            log.Error(string.Format($"No default attrbutes is registered!\nsql[{sql}]\n"));
+                            log.Error(string.Format($"没有缺省属性被登记!\nsql[{sql}]\n"));
 
-                            throw new Exception("No default attrbutes is registered!");
+                            throw new Exception("没有缺省属性被登记!");
                         }
-                        node.MaterielId = materielIdentification;
+                        node.MaterielId = Convert.ToInt64(materielIdentification);
 
                     }
                     else if (result == 1)//找到,使用找到的物料编码
@@ -1276,12 +1280,12 @@ namespace BOM.Models
                             dataReader = command.ExecuteReader();
                             dataReader.Read();
                             materielIdentification = dataReader[0].ToString().Trim();
-                            node.MaterielId = materielIdentification;
+                            node.MaterielId = Convert.ToInt64(materielIdentification);
 
                         }
                         catch (Exception e)
                         {
-                            log.Error(string.Format($"Select materiel identification Error!\nsql[{sql}]\nErrorMessage[{e.Message}]\nErrorStack[{e.StackTrace}]"));
+                            log.Error(string.Format($"查询物料编码失败!\nsql[{sql}]\nErrorMessage[{e.Message}]\nErrorStack[{e.StackTrace}]"));
                             throw;
                         }
                         finally
@@ -1298,12 +1302,12 @@ namespace BOM.Models
             }
             else
             {
-                //如果前台上送有物料编码. 当前台有物料编码时是否还允许用户修改物料的属性,如果允许修改后如果和其他物料属性值一样怎么办?
+                //如果前台上送有物料编码. 当前台有物料编码时是否还允许用户修改物料的属性,如果允许修改后如果和其他物料属性值一样怎么办??
             }
 
-            //生成DCM码
+            //生成更新DCM码
             int dcm = 0;
-            sql = $"SELECT DCM FROM TmpInfo WHERE TmpId = '{node.TmpId}'";
+            sql = $"SELECT DCM FROM TmpInfo WHERE TmpId = {node.TmpId}";
             try
             {
                 command.CommandText = sql;
@@ -1318,7 +1322,7 @@ namespace BOM.Models
 
                     if (dcm == 0 || dcm < node.NodeLevel)
                     {
-                        sql = $"UPDATE TmpInfo SET DCM = {node.NodeLevel} WHERE TmpId = '{node.TmpId}'";
+                        sql = $"UPDATE TmpInfo SET DCM = {node.NodeLevel} WHERE TmpId = {node.TmpId}";
                         command.CommandText = sql;
                         result = command.ExecuteNonQuery();
                         if (result == 0)
@@ -1331,8 +1335,8 @@ namespace BOM.Models
                 }
                 else
                 {
-                    log.Error(string.Format($"Can't find record in table TmpInfo.[{sql}]"));
-                    throw new Exception(string.Format($"Can't find record in table TmpInfo.[{sql}]"));
+                    log.Error(string.Format($"TmpInfo中无此模板信息![{sql}]"));
+                    throw new Exception(string.Format($"TmpInfo中无此模板信息![{sql}]"));
                 }
             }
             catch (Exception e)
@@ -1345,7 +1349,7 @@ namespace BOM.Models
             //登记表BOM 
 
             sql = $"INSERT INTO BOM (materielIdentfication, TmpId, CmId, CTmpId, CNum, rlSeqNo) VALUES "+
-                $"('{node.pMaterielId}','{node.PTmpId}','{node.MaterielId}','{node.TmpId}','{node.Count}',{node.rlSeqNo})";
+                $"({node.pMaterielId},{node.PTmpId},{node.MaterielId},{node.TmpId},{node.Count},{node.rlSeqNo})";
 
             try
             {

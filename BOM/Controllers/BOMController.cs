@@ -16,7 +16,7 @@ namespace BOM.Controllers
 
         [HttpGet]
         [Route("Spread")]
-        public List<NodeInfo> SpreadBOM(string pTmpId, int prlSeqNo, string tmpId, int rlSeqNo)
+        public List<NodeInfo> SpreadBOM(long pTmpId, int prlSeqNo, long tmpId, int rlSeqNo)
         {
             SqlConnection sqlConnection = DBConnection.OpenConnection();
             List<NodeInfo> list = new List<NodeInfo>();
@@ -150,7 +150,7 @@ namespace BOM.Controllers
             {
                 foreach (var node in list)
                 {
-                    newMaterielId = (string.IsNullOrEmpty(node.MaterielId)) ? true : false;
+                    newMaterielId = (node.MaterielId==null || node.MaterielId==0) ? true : false;
                     
                     bomTree.SaveNode(node);
 

@@ -90,7 +90,7 @@ namespace BOM.Models
 
             }
 
-            //更新上期库存量
+            //更新上期库存量，重排，续排才处理
             if (option == 1 || option == 2) { 
                 if (!UpdatePAB())
                 {
@@ -309,7 +309,7 @@ namespace BOM.Models
                     continue;
                 }
 
-                //是续排且本次续排没有使用该物料，则无需更新PAB
+                //是续排且本次续排没有使用该物料（item.flag == 0），则无需更新PAB
                 if ((option == 2 || option == 4) && item.flag == 0)
                 {
                     continue;
@@ -389,7 +389,7 @@ namespace BOM.Models
             surplus = stock.PAB - stock.shuL;//当前剩余的数量
             stock.shuL += item.shuL;//累计实际需要的数量
 
-            //当前剩余大于本次所需
+            //当前剩余大于本次所需，不需进一步处理
             if (surplus - item.shuL > -0.00005m)
             {
                 return;
@@ -434,7 +434,7 @@ namespace BOM.Models
                 POH = stock.PAB - stock.shuL;
 
                 //计算净需求数量NR
-                if (POH - stock.SS > 0.00005m)
+                if (POH - stock.SS > -0.00005m)
                 {
                     NR = 0.0000m;
                 }
@@ -491,6 +491,7 @@ namespace BOM.Models
                     return false;
                 }
 
+                //预排不再进行后续处理
                 if (option == 3 || option  == 4)
                 {
                     return true;
@@ -834,6 +835,8 @@ namespace BOM.Models
             Bom bom = new Bom();
             SqlDataReader reader = null;
 
+
+            //查找代用件
             sql = $"select daiWLBM from daiYJJHZhB z, daiYJJHCB c where c.zhuBBSh = z.biaoSh and c.yuanWLBM = z.wuLBM and c.yuanWLTH = z.tuH and c.yuanWLGG=z.GuiG and z.qiH='{qiH}' and z.gongZLH = '{gongZLH}' and z.wuLBM={wuLBM}";
             cmd.CommandText = sql;
             try
@@ -858,6 +861,7 @@ namespace BOM.Models
                 reader?.Close();
             }
 
+            //查找当前物料信息 Cmid = tmpWuLBM
             sql = $"select * from BOM where CmId = {tmpWuLBM}";
             cmd.CommandText = sql;
             try
@@ -865,7 +869,7 @@ namespace BOM.Models
                 reader = cmd.ExecuteReader();
                 if (reader.HasRows)
                 {
-                    bom.materielIdentfication = wuLBM;
+                    bom.materielIdentfication = tmpWuLBM;
                     bom.tmpId = Convert.ToInt64(reader["tmpId"].ToString());
                     bom.CTmpId = Convert.ToInt64(reader["CTmpId"].ToString());
                     bom.CmId = Convert.ToInt64(reader["CmId"].ToString());
@@ -889,8 +893,10 @@ namespace BOM.Models
                 reader.Close();
             }
 
+            //登记物料树
             bomTree.Add(bom);
 
+            //查找当前物料的子物料
             sql = $"select * from BOM where materielIdentfication = {wuLBM} ";
             cmd.CommandText = sql;
             try
@@ -1003,7 +1009,7 @@ namespace BOM.Models
 
         public string guige { get; set; }   //规格
 
-        public int flag { get; set; }  //1.本次排产用到该物料 0.没有用到
+        public int flag { get; set; }  // 0.本次请求没有用到该物料
     }
 
     public class Bom

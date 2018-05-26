@@ -37,7 +37,7 @@ namespace BOM.Models
             int i = 0;
             List<PlanItem> items = requestItems.OrderBy(m => m.qiH).ThenBy(m => m.xuH).ThenBy(m => m.gongZLH).ToList();
 
-            //初始化库存数据
+            //初始化库存数据：将缺省属性读取到stacks
             if (!InitData())
             {
                 log.Error(string.Format($"Init Data Failed!\n"));
@@ -107,11 +107,44 @@ namespace BOM.Models
 
         private bool GetPlanCount(PlanItem item)
         {
+            int Count = 0;
+
+            sql = $"select count(*) from switch where gongZLH='{item.gongZLH}' and qiH='{item.qiH}' and xuH={item.xuH}";
+            cmd.CommandText = sql;
+            try
+            {
+                Count = Convert.ToInt32(cmd.ExecuteScalar());               
+            }
+            catch (Exception e)
+            {
+                log.Error(string.Format($"select switch error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                return false;
+            }
+
+            if (Count == 0)
+            {
+                tableFlag = 0;
+                sql = $"insert into switch (gongZLH, qiH, xuH, ciSh) values ('{item.gongZLH}','{item.qiH}' , {item.xuH}, 0)";
+                cmd.CommandText = sql;
+                try
+                {
+                   cmd.ExecuteNonQuery();
+                }
+                catch (Exception e)
+                {
+                    log.Error(string.Format($"insert table switch error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                    return false;
+                }
+                return true;
+            }
+
+
+
             sql = $"select ciSh from switch where gongZLH='{item.gongZLH}' and qiH='{item.qiH}' and xuH={item.xuH}";
             cmd.CommandText = sql;
             try
             {
-                var Count = Convert.ToInt32(cmd.ExecuteScalar());
+                Count = Convert.ToInt32(cmd.ExecuteScalar());
                 //tableFlag=0时，续排登记缺件表1，PAB登记daefault._store1_,否则登记缺件表，PAB登记daefault._store_
                 tableFlag = Count % 2;  
             }
@@ -122,6 +155,7 @@ namespace BOM.Models
             }
             return true;
         }
+
         private bool InitData()
         {
             SqlDataReader dataReader = null;
@@ -143,46 +177,54 @@ namespace BOM.Models
                             var item = new Stock();
                             item.flag = 0;
 
+                            //物料编码
                             tmp = dataReader["materielIdentfication"].ToString();
-                            item.wuLBM = Convert.ToInt64(tmp);   //物料编码
+                            item.wuLBM = Convert.ToInt64(tmp);   
 
+                            //在途数量
                             tmp = dataReader["SR"].ToString();
-                            item.SOR = Convert.ToDecimal(tmp == string.Empty?"0.00":tmp);          //在途数量
+                            item.SOR = Convert.ToDecimal(tmp == string.Empty?"0.00":tmp);          
 
-                            if (option == 1 || option == 3)//重排
+                            //上期库存数量
+                            if (option == 1 || option == 3)//续拍，预续排
                             {
-                                tmp = dataReader["_STORE_"].ToString();
-                                item.PAB = Convert.ToDecimal(tmp == string.Empty ? "0.00" : tmp);     //上期库存数量
-                            }
-                            else
-                            {
-                                if (tableFlag == 0)
+                                if (tableFlag == 0)//本次从_STORE_获取值，计算后的新值登记到_STORE1_中
                                 {
                                     tmp = dataReader["_STORE_"].ToString();
-                                    item.PAB = Convert.ToDecimal(tmp == string.Empty ? "0.00" : tmp);     //上期库存数量
+                                    item.PAB = Convert.ToDecimal(tmp == string.Empty ? "0.00" : tmp); 
                                 }
-                                else {
+                                else {//本次从_STORE1_获取值，计算后的新值登记到_STORE_中
                                     tmp = dataReader["_STORE1_"].ToString();
-                                    item.PAB = Convert.ToDecimal(tmp == string.Empty ? "0.00" : tmp);     //上期库存数量
+                                    item.PAB = Convert.ToDecimal(tmp == string.Empty ? "0.00" : tmp);
                                 }
                             }
 
+                            //安全库存
                             tmp = dataReader["SS"].ToString();
-                            item.SS = Convert.ToDecimal(tmp == string.Empty ? "0.00": tmp);           //安全库存
+                            item.SS = Convert.ToDecimal(tmp == string.Empty ? "0.00": tmp);
 
+                            //批量规则
                             tmp = dataReader["LS"].ToString();
-                            item.LS = Convert.ToDecimal(tmp == string.Empty ? "0.00" : tmp);           //批量规则
+                            item.LS = Convert.ToDecimal(tmp == string.Empty ? "0.00" : tmp);
 
-                            item.shengChXSh = dataReader["SHENGCLX"].ToString();                //生产形式
+                            //生产形式
+                            item.shengChXSh = dataReader["SHENGCLX"].ToString();
 
+                            //投料标识
                             tmp = dataReader["touLBSh"].ToString();
-                            item.touLBSh = Convert.ToInt64(tmp == string.Empty?"0": tmp);   //投料标识
+                            item.touLBSh = Convert.ToInt64(tmp == string.Empty?"0": tmp);
 
-                            item.zum = dataReader["zum"].ToString();                            //工序号
-                            item.tuhao = dataReader["tuhao"].ToString();                            //图号
-                            item.guige = dataReader["guige"].ToString();                            //规格
+                            //工序号
+                            item.zum = dataReader["zum"].ToString();
 
-                            item.OH = 0.00m;                                                //获取在库数量OH
+                            //图号
+                            item.tuhao = dataReader["tuhao"].ToString();
+
+                            //规格
+                            item.guige = dataReader["guige"].ToString();
+
+                            //在库数量OH初始化
+                            item.OH = 0.00m;
 
                             stocks.Add(item);
                         }
@@ -203,9 +245,9 @@ namespace BOM.Models
                     dataReader.Close();
                 }
 
+                //获取每个物料的库存数量
                 foreach (var item in stocks)
                 {
-
                     sql = $"select sum(kuCSh) from kuCShJB001 where wuLBM = {item.wuLBM}";
                     cmd.CommandText = sql;
                     cmd.Connection = connection;

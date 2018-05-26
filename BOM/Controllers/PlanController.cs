@@ -10,6 +10,7 @@ using System.Web.Http;
 namespace BOM.Controllers
 {
     [RoutePrefix("Plan")]
+    //排产
     public class PlanController : ApiController
     {
         log4net.ILog log = log4net.LogManager.GetLogger("Plan");

@@ -14,7 +14,11 @@ namespace Test
         {
             log4net.Config.XmlConfigurator.Configure();
             log4net.ILog log = log4net.LogManager.GetLogger("TEST");
-            log.Info("hello");
+            //log.Info("hello");
+            string sql = "";
+            SqlConnection sqlConnection = DBConnection.OpenConnection();
+            SqlCommand cmd = new SqlCommand();
+            cmd.Connection = sqlConnection;
             //AttrDefineOperation attrDefine = new AttrDefineOperation();
             //attrDefine.Insert("tmpid","attid","attname","C","tao");
             //attrDefine.Update("tmpid", "attid", "attname", "C", "tmpid1","tmpid2","tmpid3","T","sun");
@@ -203,9 +207,87 @@ namespace Test
             DBConnection.CloseConnection(sqlConnection);
             */
 
-            Console.WriteLine(Convert.ToDecimal(".25"));
+            //Console.WriteLine(Convert.ToDecimal(".25"));
 
+            //// 测试查询不到数据返回何值
+            //int i = -1;
+            //SqlConnection sqlConnection = DBConnection.OpenConnection();
+            //try
+            //{
+            //    using (SqlCommand cmd = new SqlCommand("select ciSh from switch", sqlConnection))
+            //    {
+            //        i = (int)(cmd.ExecuteScalar());
+
+            //    }
+            //}
+            //catch (Exception e)
+            //{
+            //    Console.WriteLine(e.StackTrace);
+            //    Console.WriteLine("error");
+            //}
+            //finally
+            //{
+            //    DBConnection.CloseConnection(sqlConnection);
+            //}
+            //Console.WriteLine(i);
+
+            //测试GetPlanCount
+            int Count = 0;
+            int tableFlag = 0;
+
+            sql = $"select count(*) from switch where gongZLH='aa' and qiH='aa' and xuH=1";
+            cmd.CommandText = sql;
+            try
+            {
+                Count = Convert.ToInt32(cmd.ExecuteScalar());
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(string.Format($"select switch error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                return;
+            }
+
+            if (Count == 0)
+            {
+                tableFlag = 0;
+                sql = $"insert into switch (gongZLH, qiH, xuH, ciSh) values ('aa','aa' , 1, 0)";
+                cmd.CommandText = sql;
+                try
+                {
+                    cmd.ExecuteNonQuery();
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine(string.Format($"insert table switch error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+
+                    return ;
+                }
+                return;
+            }
+
+
+
+            sql = $"select ciSh from switch where gongZLH='aa' and qiH='aa' and xuH=1";
+            cmd.CommandText = sql;
+            try
+            {
+                Count = Convert.ToInt32(cmd.ExecuteScalar());
+                //tableFlag=0时，续排登记缺件表1，PAB登记daefault._store1_,否则登记缺件表，PAB登记daefault._store_
+                tableFlag = Count % 2;
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(string.Format($"select switch error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+
+                return;
+            }
+            Console.WriteLine(tableFlag);
+
+            cmd.Dispose();
+            sqlConnection.Close();
         }
+
+
 
         public static void printnode(NodeInfo node)
         {

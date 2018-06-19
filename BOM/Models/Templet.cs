@@ -456,7 +456,11 @@ namespace BOM.Models
                     sql = $"UPDATE TmpInfo SET LockCount = LockCount+1 WHERE TmpId = '{templetId}'";
                     command.CommandText = sql;
                     result1 = command.ExecuteNonQuery();
-
+                    if (result1 == 0)//无此模板
+                    {
+                        log.Error(string.Format($"无此模板!\nsql[{sql}]\n"));
+                        throw new Exception("Lock templet error!!无此模板");
+                    }
                     sql = $"UPDATE Relation SET LockFlag = 1 WHERE LockFlag = 0 AND CTmpId = '{templetId}'";
                     command.CommandText = sql;
                     result2 = command.ExecuteNonQuery();
@@ -476,7 +480,7 @@ namespace BOM.Models
                     DBConnection.CloseConnection(sqlConnection);
                     throw;
                 }
-                if (result4 == 0)//其它result可能存在等于0的情况,不作例外处理
+                if ( result4 == 0)//其它result可能存在等于0的情况,不作例外处理
                 {
                     log.Error(string.Format($"Lock templet error!\nsql[{sql}]\n"));
                     sqlTransaction.Rollback();

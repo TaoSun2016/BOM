@@ -9,14 +9,14 @@ using System.Web.Http;
 
 namespace BOM.Controllers
 {
-    [RoutePrefix("Plan")]
+    [RoutePrefix("BOM")]
     //排产
     public class PlanController : ApiController
     {
         log4net.ILog log = log4net.LogManager.GetLogger("Plan");
 
         [HttpPost]
-        [Route("Create")]
+        [Route("Plan")]
         public void CreatePlan(PlanRequest request)
         {
             //PlanRequest request = new PlanRequest();

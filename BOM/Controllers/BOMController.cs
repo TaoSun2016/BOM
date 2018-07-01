@@ -148,13 +148,19 @@ namespace BOM.Controllers
 
             try
             {
+                //不同的物料树会包含相同的物料编码吗？？？如果是的话，BOM表主键就不能是materialId,而因该加上PeiTNO,同一BOM数不同节点可能有相同的物料编码吗？
+                if (!bomTree.CheckRootNode(list))
+                {
+                    throw new Exception("根物料编码重复");
+                }
+
                 foreach (var node in list)
                 {
-                    newMaterielId = (node.MaterielId==null || node.MaterielId==0) ? true : false;
+                    newMaterielId = (node.MaterielId==0L) ? true : false;
                     
                     bomTree.SaveNode(node);
 
-                    //如果保存的节点新生产了物料编码,则该物料编码要保存到其子节点的父物料编码中.
+                    //如果保存的节点新生成了物料编码,则该物料编码要保存到其子节点的父物料编码字段中.
                     if (newMaterielId)
                     {
                        foreach(var cnode in  list.Where(m => m.NodeLevel == (node.NodeLevel + 1) && 

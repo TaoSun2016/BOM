@@ -87,13 +87,14 @@ namespace BOM.Models
                     while (dataReader.Read())
                     {
 
-                        nodeInfo.Attributes.Add(new TempletAttribute {
-                                                        Flag = dataReader["Flag"].ToString(),
-                                                        Id = dataReader["AttrId"].ToString(),
-                                                        Name = dataReader["AttrNm"].ToString(),
-                                                        Type = dataReader["AttrTp"].ToString(),
-                                                        Values = new List<string>()
-                                                     }
+                        nodeInfo.Attributes.Add(new TempletAttribute
+                        {
+                            Flag = dataReader["Flag"].ToString(),
+                            Id = dataReader["AttrId"].ToString(),
+                            Name = dataReader["AttrNm"].ToString(),
+                            Type = dataReader["AttrTp"].ToString(),
+                            Values = new List<string>()
+                        }
                                                 );
                     }
                 }
@@ -106,7 +107,7 @@ namespace BOM.Models
                 {
                     dataReader.Close();
                 }
-                
+
                 list.Add(nodeInfo);
 
                 //获取当前模板的子模板
@@ -158,7 +159,7 @@ namespace BOM.Models
             string materielIdentification = null;
             string sql = null;
 
-            StringBuilder insertBuilder = new StringBuilder($"INSERT INTO {nodeInfo.TmpId} (");
+            StringBuilder insertBuilder = new StringBuilder($"INSERT INTO [{nodeInfo.TmpId}] (");
             StringBuilder insertValues = new StringBuilder($" ) VALUES (");
             SqlConnection sqlConnection = DBConnection.OpenConnection();
             SqlTransaction sqlTransaction = sqlConnection.BeginTransaction();
@@ -195,7 +196,7 @@ namespace BOM.Models
                     }
 
                     //检查当前私有属性的值是否已存在，存在则报错
-                    StringBuilder builder = new StringBuilder($"SELECT COUNT(*) FROM {nodeInfo.TmpId} WHERE");
+                    StringBuilder builder = new StringBuilder($"SELECT COUNT(*) FROM [{nodeInfo.TmpId}] WHERE");
 
                     int counter = 0;
                     var privateAttributes = nodeInfo.Attributes.Where(m => m.Flag == "1");
@@ -204,14 +205,14 @@ namespace BOM.Models
                         counter++;
                         if (attrbute.Type == "C")
                         {
-                            builder.Append($" {attrbute.Id} = '{attrbute.Values[0]}'");
-                            insertBuilder.Append($" {attrbute.Id},");
+                            builder.Append($" [{attrbute.Id}] = '{attrbute.Values[0]}'");
+                            insertBuilder.Append($" [{attrbute.Id}],");
                             insertValues.Append($" '{attrbute.Values[0]}',");
                         }
                         else
                         {
-                            builder.Append($" {attrbute.Id} = {attrbute.Values[0]}");
-                            insertBuilder.Append($" {attrbute.Id},");
+                            builder.Append($" [{attrbute.Id}] = {attrbute.Values[0]}");
+                            insertBuilder.Append($" [{attrbute.Id}],");
                             insertValues.Append($" {attrbute.Values[0]},");
                         }
 
@@ -241,7 +242,7 @@ namespace BOM.Models
                     }
                 }
 
-                
+
                 //生成物料编码
                 sql = $"SELECT NEXT_NO FROM SEQ_NO WHERE Ind_Key = '{nodeInfo.TmpId}'";
 
@@ -261,7 +262,7 @@ namespace BOM.Models
 
                         dataReader.Close();
 
-                        materielIdentification = $"{nodeInfo.TmpId}" +"9"+ Convert.ToString(nextNo, 8);
+                        materielIdentification = $"{nodeInfo.TmpId}" + Convert.ToString(nextNo, 8);
                         nextNo += 1;
                         sql = $"UPDATE SEQ_NO SET NEXT_NO = {nextNo} WHERE IND_KEY = '{nodeInfo.TmpId}'";
                     }
@@ -323,7 +324,7 @@ namespace BOM.Models
                 var defaultAttributes = nodeInfo.Attributes.Where(m => m.Flag == "0");
                 foreach (var defaultAttrbute in defaultAttributes)
                 {
-                    insertBuilder.Append($" {defaultAttrbute.Id},");
+                    insertBuilder.Append($" [{defaultAttrbute.Id}],");
                     if (defaultAttrbute.Type == "C")
                     {
                         insertValues.Append($" '{defaultAttrbute.Values[0]}',");
@@ -372,7 +373,7 @@ namespace BOM.Models
             using (SqlCommand command = new SqlCommand())
             {
                 command.Connection = sqlConnection;
-                sql = $"DELETE FROM BOM WHERE materielIdentfication = '{pMaterielId}' AND CmId = '{materielId}' and rlSeqNo = {rlSeqNo}";
+                sql = $"DELETE FROM BOM WHERE materielIdentfication = {pMaterielId} AND CmId = {materielId} and rlSeqNo = {rlSeqNo}";
                 command.CommandText = sql;
                 try
                 {
@@ -402,7 +403,7 @@ namespace BOM.Models
             bool uniqFlag = false;
             string sql = null;
             StringBuilder stringBuilder = new StringBuilder();
-        
+
 
             NodeInfo child = new NodeInfo();
             List<long> listCtmpId = new List<long>();
@@ -429,11 +430,11 @@ namespace BOM.Models
                 {
                     List<long> materielIdList = new List<long>();
                     stringBuilder.Clear();
-                    stringBuilder.Append($"SELECT ISNULL(materielIdentfication,0)  AS ID FROM {node.TmpId} WHERE 1 = 1");
+                    stringBuilder.Append($"SELECT ISNULL(materielIdentfication,0)  AS ID FROM [{node.TmpId}] WHERE 1 = 1");
                     foreach (var attribute in node.Attributes.Where(m => m.Flag == "1"))
                     {
                         var value = (attribute.Type == "C") ? ("'" + attribute.Values[0].Trim() + "'") : attribute.Values[0].Trim();
-                        stringBuilder.Append($" AND {attribute.Id} = {value}");
+                        stringBuilder.Append($" AND [{attribute.Id}] = {value}");
                     }
                     sql = stringBuilder.ToString();
                     command.CommandText = sql;
@@ -474,9 +475,9 @@ namespace BOM.Models
                     return;
                 }
             }
-           
+
             //如果此处物料编码仍为0,则返回0作为物料编码
-           
+
             //登记当前节点到节点列表
             list.Add(node);
 
@@ -548,12 +549,14 @@ namespace BOM.Models
                         while (reader.Read())
                         {
 
-                            child.Attributes.Add(new TempletAttribute {
-                                                        Flag = reader["Flag"].ToString().Trim(),
-                                                        Id = reader["AttrId"].ToString().Trim(),
-                                                        Name = reader["AttrNm"].ToString().Trim(),
-                                                        Type = reader["AttrTp"].ToString().Trim(),
-                                                        Values = new List<string>() });
+                            child.Attributes.Add(new TempletAttribute
+                            {
+                                Flag = reader["Flag"].ToString().Trim(),
+                                Id = reader["AttrId"].ToString().Trim(),
+                                Name = reader["AttrNm"].ToString().Trim(),
+                                Type = reader["AttrTp"].ToString().Trim(),
+                                Values = new List<string>()
+                            });
                         }
                         reader.Close();
                     }
@@ -1019,7 +1022,8 @@ namespace BOM.Models
                         attribute.Values.AddRange(values);
                     }
                 }
-                else {
+                else
+                {
                     //如果找不到属性关系定义，则不赋值
                     reader.Close();
                 }
@@ -1047,10 +1051,10 @@ namespace BOM.Models
                         {
                             returnString.Append("");
                         }
-                        
+
 
                         //如果父属性有多个取值,子属性也只取一个,否则取值就没法算了
-                        
+
                     }
                     else
                     {
@@ -1085,27 +1089,115 @@ namespace BOM.Models
             }
         }
 
+        //检查根物料编码是否重复，重复报错
+        public bool CheckRootNode(List<NodeInfo> list)
+        {
+            int result = 0;
+            string sql = "";
+            var root_node = list.Find(m => m.NodeLevel == 1 && m.PTmpId == 0 && m.pMaterielId == 0);
+            if (root_node.MaterielId != 0)
+            {
+                sql = $"select count(*) from BOM where materielIdentfication = 0 and tmpId = 0 and Cmid = {root_node.MaterielId}";
+            }
+            else
+            {
+                //节点是否含有私有属性
+                bool hasPrivateAttribute = root_node.Attributes.Where(m => m.Flag == "1").Count() > 0;
+                if (hasPrivateAttribute)
+                {
+                    //检查私有属性表是否存在，不存在则报错
+                    sql = $"SELECT COUNT(*) FROM SYSOBJECTS WHERE NAME = '{root_node.TmpId}' ";
+                    command.CommandText = sql;
+                    try
+                    {
+                        result = (int)command.ExecuteScalar();
+                    }
+                    catch (Exception e)
+                    {
+                        log.Error(string.Format($"Look for talbe {root_node.TmpId} Error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                        return false;
+                    }
+                    if (result == 0)
+                    {
+                        log.Error(string.Format($"Table {root_node.TmpId} doesn't exsit!\nsql[{sql}]\n"));
+                        throw new Exception($"Table {root_node.TmpId} doesn't exsit!!");
+                    }
+
+                    //根据私有属性查询私有属性表的SQL语句
+                    StringBuilder builder = new StringBuilder($"SELECT COUNT(*) FROM [{root_node.TmpId}] WHERE");
+
+                    int counter = 0;
+                    var privateAttributes = root_node.Attributes.Where(m => m.Flag == "1");
+                    foreach (var attrbute in privateAttributes)
+                    {
+                        counter++;
+                        if (attrbute.Type == "C")
+                        {
+                            builder.Append($" [{attrbute.Id}] = '{attrbute.Values[0]}'");
+                        }
+                        else
+                        {
+                            builder.Append($" [{attrbute.Id}] = {attrbute.Values[0]}");
+                        }
+
+                        if (counter != privateAttributes.Count())
+                        {
+                            builder.Append($" AND");
+                        }
+                    }
+                    sql = builder.ToString();
+                }
+                else
+                {
+                    log.Error(string.Format($"上送节点没有私有属性!\n"));
+                    LogNode(root_node);
+                    return false;
+                }
+            }
+            command.CommandText = sql;
+            try
+            {
+                result = (int)command.ExecuteScalar();
+            }
+            catch (Exception e)
+            {
+                log.Error(string.Format($"Select private attribute Error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                return false;
+            }
+            //根据私有属性找不到记录,则新生成物料编码，并登记私有属性
+            if (result == 0)
+            {
+                return true;
+            }
+            else
+            {
+                log.Error(string.Format($"根物料编码已存在!\nsql[{sql}]\n"));
+                return false;
+            }
+
+        }
+
         //保存节点
-        public bool SaveNode( NodeInfo node)
+        public bool SaveNode(NodeInfo node)
         {
             int result = -1;
             bool hasPrivateAttribute = false;
             string materielIdentification = null;
             string sql = null;
-            StringBuilder insertBuilder = new StringBuilder($"INSERT INTO {node.TmpId} (");
+            StringBuilder insertBuilder = new StringBuilder($"INSERT INTO [{node.TmpId}] (");
             StringBuilder insertValues = new StringBuilder($" ) VALUES (");
 
             SqlDataReader dataReader = null;
 
             //如果节点没有物料编码则生成
-            if (node.MaterielId == null || node.MaterielId == 0)
+            if (node.MaterielId == 0)
             {
                 //节点是否含有私有属性
                 hasPrivateAttribute = node.Attributes.Where(m => m.Flag == "1").Count() > 0;
                 if (hasPrivateAttribute)
                 {
                     //检查私有属性表是否存在，不存在则报错
-                    sql = $"SELECT COUNT(*) FROM SYSOBJECTS WHERE NAME = {node.TmpId} ";
+                    sql = $"SELECT COUNT(*) FROM SYSOBJECTS WHERE NAME = '{node.TmpId}' ";
                     command.CommandText = sql;
                     try
                     {
@@ -1123,8 +1215,9 @@ namespace BOM.Models
                     }
 
                     //如果有私有属性表，则登记当前私有属性到表中
-                    StringBuilder builder = new StringBuilder($"SELECT COUNT(*) FROM {node.TmpId} WHERE");
-                    StringBuilder mIdBuilder = new StringBuilder($"SELECT materielIdentfication FROM {node.TmpId} WHERE");
+                    //根据私有属性查询私有属性表的SQL语句
+                    StringBuilder builder = new StringBuilder($"SELECT COUNT(*) FROM [{node.TmpId}] WHERE");
+                    StringBuilder mIdBuilder = new StringBuilder($"SELECT materielIdentfication FROM [{node.TmpId}] WHERE");
 
                     int counter = 0;
                     var privateAttributes = node.Attributes.Where(m => m.Flag == "1");
@@ -1133,16 +1226,16 @@ namespace BOM.Models
                         counter++;
                         if (attrbute.Type == "C")
                         {
-                            builder.Append($" {attrbute.Id} = '{attrbute.Values[0]}'");
-                            mIdBuilder.Append($" {attrbute.Id} = '{attrbute.Values[0]}'");
-                            insertBuilder.Append($" {attrbute.Id},");
+                            builder.Append($" [{attrbute.Id}] = '{attrbute.Values[0]}'");
+                            mIdBuilder.Append($" [{attrbute.Id}] = '{attrbute.Values[0]}'");
+                            insertBuilder.Append($" [{attrbute.Id}],");
                             insertValues.Append($" '{attrbute.Values[0]}',");
                         }
                         else
                         {
-                            builder.Append($" {attrbute.Id} = {attrbute.Values[0]}");
-                            mIdBuilder.Append($" {attrbute.Id} = {attrbute.Values[0]}");
-                            insertBuilder.Append($" {attrbute.Id},");
+                            builder.Append($" [{attrbute.Id}] = {attrbute.Values[0]}");
+                            mIdBuilder.Append($" [{attrbute.Id}] = {attrbute.Values[0]}");
+                            insertBuilder.Append($" [{attrbute.Id}],");
                             insertValues.Append($" {attrbute.Values[0]},");
                         }
 
@@ -1171,14 +1264,14 @@ namespace BOM.Models
                         try
                         {
                             command.CommandText = sql;
-                            dataReader = command.ExecuteReader();                          
+                            dataReader = command.ExecuteReader();
                             if (dataReader.HasRows)
                             {
                                 dataReader.Read();
                                 long nextNo = Convert.ToInt64(dataReader[0].ToString());
                                 dataReader.Close();
 
-                                materielIdentification = $"{node.TmpId}9" + Convert.ToString(nextNo, 8);
+                                materielIdentification = $"{node.TmpId}" + Convert.ToString(nextNo, 8);
                                 nextNo += 1;
                                 sql = $"UPDATE SEQ_NO SET NEXT_NO = {nextNo} WHERE IND_KEY = '{node.TmpId}'";
                             }
@@ -1240,7 +1333,7 @@ namespace BOM.Models
                         var defaultAttributes = node.Attributes.Where(m => m.Flag == "0");
                         foreach (var defaultAttrbute in defaultAttributes)
                         {
-                            insertBuilder.Append($" {defaultAttrbute.Id},");
+                            insertBuilder.Append($" [{defaultAttrbute.Id}],");
                             if (defaultAttrbute.Type == "C")
                             {
                                 insertValues.Append($" '{defaultAttrbute.Values[0]}',");
@@ -1298,7 +1391,13 @@ namespace BOM.Models
                         log.Error(string.Format($"Found more than one records!\nsql[{sql}]\n"));
                         throw new Exception("Found more than one records!!!");
                     }
-                }               
+                }
+                else
+                {//??????
+                    log.Error(string.Format($"上送节点没有私有属性!\n"));
+                    LogNode(node);
+                    throw new Exception("上送节点没有私有属性!!!!");
+                }
             }
             else
             {
@@ -1348,8 +1447,8 @@ namespace BOM.Models
 
             //登记表BOM 
 
-            sql = $"INSERT INTO BOM (materielIdentfication, TmpId, CmId, CTmpId, CNum, rlSeqNo) VALUES "+
-                $"({node.pMaterielId},{node.PTmpId},{node.MaterielId},{node.TmpId},{node.Count},{node.rlSeqNo})";
+            sql = $"INSERT INTO BOM (materielIdentfication, TmpId, CmId, CTmpId, CNum, rlSeqNo, peiTNo) VALUES " +
+                $"({node.pMaterielId},{node.PTmpId},{node.MaterielId},{node.TmpId},{node.Count},{node.rlSeqNo},{node.peiTNo})";
 
             try
             {
@@ -1374,16 +1473,16 @@ namespace BOM.Models
         {
             log.Info("=====================");
             log.Info("NodeLevel=" + node.NodeLevel);
-            log.Info("ptmpid="+node.PTmpId+"  pmaterielid="+node.pMaterielId);
-            log.Info("TmpId=" + node.TmpId+"  materelid="+node.MaterielId);
+            log.Info("ptmpid=" + node.PTmpId + "  pmaterielid=" + node.pMaterielId);
+            log.Info("TmpId=" + node.TmpId + "  materelid=" + node.MaterielId);
             foreach (var attr in node.Attributes)
             {
                 log.Info("---------------------------");
 
-                log.Info(attr.Id + "----" + attr.Name+":");
+                log.Info(attr.Id + "----" + attr.Name + ":");
                 foreach (var value in attr.Values)
                 {
-                    log.Info("=>"+value);
+                    log.Info("=>" + value);
                 }
             }
             log.Info("=====================");
@@ -1402,6 +1501,7 @@ namespace BOM.Models
         public long MaterielId { get; set; }
         public int rlSeqNo { get; set; }
         public decimal Count { get; set; }
+        public int peiTNo { get; set; }
         public List<TempletAttribute> Attributes { get; set; }
         public NodeInfo()
         {

@@ -57,7 +57,7 @@ namespace BOM.Models
                     }
                 }
                 //初始化当前物料的BOM树
-                if (InitBomTree(item))
+                if (!InitBomTree(item))
                 {
                     log.Error(string.Format($"初始化BOM树失败，BOMID={item.wuLBM}\n"));
                     return false;
@@ -276,7 +276,8 @@ namespace BOM.Models
         {
             if (option == 1 || option == 3 )//重排，预重排
             {
-                sql = $"delete from switch where gongZLH='{item.gongZLH}' and qiH='{item.qiH}' and xuH={item.xuH} insert into switch (gongZLH, qiH, xuH, ciSh) value ('{item.gongZLH}', '{item.qiH}', {item.xuH}, 0)";
+                sql = $"delete from switch where gongZLH='{item.gongZLH}' and qiH='{item.qiH}' and xuH={item.xuH} " +
+                      $"insert into switch (gongZLH, qiH, xuH, ciSh) values ('{item.gongZLH}', '{item.qiH}', {item.xuH}, 0)";
                 
             }
             else
@@ -288,7 +289,7 @@ namespace BOM.Models
             {
                 cmd.ExecuteNonQuery();
             }
-            catch (Exception e)
+            catch 
             {
                 log.Error(string.Format($"update switch Error!\nsql[{sql}]\n"));
                 return false;
@@ -323,7 +324,7 @@ namespace BOM.Models
                     fieldName = "_STORE1_";
                 }
                
-                sb.Append($"UPDATE DeafaultAttr SET {fieldName} = {item.PAB} WHERE materielIdentfication = {item.wuLBM} ");
+                sb.Append($"UPDATE DeafaultAttr SET [{fieldName}] = {item.PAB} WHERE materielIdentfication = {item.wuLBM} ");
 
                 if (iterator % 1000 == 0)
                 {
@@ -356,15 +357,15 @@ namespace BOM.Models
                 try
                 {
                     var result = cmd.ExecuteNonQuery();
-                    if (result != 1)
+                    if (result == 0)
                     {
-                        log.Error(string.Format($"Update DeafaultAttr Error!\nsql[{sql}]\n"));
+                        log.Error(string.Format($"Update DeafaultAttr Error!\nsql=[{sql}]\n"));
                         return false;
                     }
                 }
                 catch (Exception e)
                 {
-                    log.Error(string.Format($"Update DeafaultAttr Error\nsql[{sql}]\nError[{e.StackTrace}]"));
+                    log.Error(string.Format($"Update DeafaultAttr Error\nsql=[{sql}]\nError[{e.StackTrace}]"));
                     return false;
                 }
                 finally
@@ -477,7 +478,8 @@ namespace BOM.Models
                 }
 
                     
-                sql = $"delete from {tableName} where gongZLH={item.gongZLH} and qiH={item.qiH} and wuLBM={stock.wuLBM} insert into {tableName} (wuLBM, gongZLBSh, mingCh, guiG, tuH, shengChXSh, gongShSh, queJShL, qiH, jiHBB, chunJHQJ, gongZLH) values ({stock.wuLBM},'','','','',{stock.shengChXSh},0.00,{PORC},{item.qiH},'',0.00,{item.gongZLH})";
+                sql = $"delete from [{tableName}] where gongZLH='{item.gongZLH}' and qiH='{item.qiH}' and wuLBM={stock.wuLBM} " +
+                      $"insert into [{tableName}] (gongZLH, qiH, xuH, wuLBM, gongZLBSh, mingCh, guiG, tuH, shengChXSh, gongShSh, queJShL, jiHBB, chunJHQJ ) values ('{item.gongZLH}', '{item.qiH}', 0, {stock.wuLBM},'','','','',{stock.shengChXSh},0.00,{PORC},'',0.00)";
 
 
                 cmd.CommandText = sql;
@@ -538,7 +540,7 @@ namespace BOM.Models
                         break;
                     case "1"://自制件
                              //工序转移准备单主表 gongXZhYZhBDZhB
-                        sql = $"select count(wuLBM) from gongXZhYZhBDZhB where gongZLH = {item.gongZLH} and qiH = {item.qiH} and wuLBM = {stock.wuLBM}";
+                        sql = $"select count(wuLBM) from gongXZhYZhBDZhB where gongZLH = '{item.gongZLH}' and qiH = '{item.qiH}' and wuLBM = {stock.wuLBM}";
                         cmd.CommandText = sql;
                         try
                         {
@@ -548,7 +550,7 @@ namespace BOM.Models
                                 if (option == 1 || option == 3)//重排，预重排 覆盖原记录计划数量的值
                                 {
                                     //?? 给哪些字段赋值
-                                    sql = $"delete from gongXZhYZhBDZhB where gongZLH = {item.gongZLH} and qiH = {item.qiH} and wuLBM = {stock.wuLBM} ";
+                                    sql = $"delete from gongXZhYZhBDZhB where gongZLH = '{item.gongZLH}' and qiH = '{item.qiH}' and wuLBM = {stock.wuLBM} ";
                                 }
                                 else//续排 报错??应该是查到续排前有重复的领号，期号，序号的记录就报错
                                 {
@@ -565,7 +567,7 @@ namespace BOM.Models
                                 chanPMCh = stock.wuLBM.ToString().Substring(0, pos);
                             }
 
-                            sql = sql + $"insert into gongXZhYZhBDZhB (wuLBM,chanPMCh，gongXBSh) values ({stock.wuLBM},{chanPMCh}，{stock.zum})";
+                            sql = sql + $"insert into gongXZhYZhBDZhB (wuLBM,chanPMCh，gongXBSh) values ({stock.wuLBM},'{chanPMCh}'，{stock.zum})";
 
                             cmd.CommandText = sql;
                             result = cmd.ExecuteNonQuery();
@@ -582,7 +584,7 @@ namespace BOM.Models
                         }
 
                         //工序转移准备单从表 gongXZhYZhBDCB
-                        sql = $"select count(wuLBM) from gongXZhYZhBDCB where gongZLH = {item.gongZLH} and qiH = {item.qiH} and xuH = {item.xuH} and wuLBM = {stock.wuLBM}";
+                        sql = $"select count(wuLBM) from gongXZhYZhBDCB where gongZLH = '{item.gongZLH}' and qiH = '{item.qiH}' and xuH = {item.xuH} and wuLBM = {stock.wuLBM}";
                         cmd.CommandText = sql;
                         try
                         {
@@ -592,7 +594,7 @@ namespace BOM.Models
                                 if (option == 1 || option == 3)//重排，预重排 覆盖原记录计划数量的值
                                 {
                                     //
-                                    sql = $"delete from gongXZhYZhBDCB where gongZLH = {item.gongZLH} and qiH = {item.qiH} and xuH = {item.xuH} and wuLBM = {stock.wuLBM} ";
+                                    sql = $"delete from gongXZhYZhBDCB where gongZLH = '{item.gongZLH}' and qiH = '{item.qiH}' and xuH = {item.xuH} and wuLBM = {stock.wuLBM} ";
                                 }
                                 else//续排 报错??
                                 {
@@ -601,7 +603,7 @@ namespace BOM.Models
                                 }
                             }
 
-                            sql = sql + $"insert into gongXZhYZhBDCB (gongZLH, qiH, xuH, wuLBM, jiHShL,tuH, guiG ) values ({item.gongZLH},{item.qiH},{item.xuH},{stock.wuLBM},{PORC},{stock.tuhao},{stock.guige})";
+                            sql = sql + $"insert into gongXZhYZhBDCB (gongZLH, qiH, xuH, wuLBM, jiHShL,tuH, guiG ) values ('{item.gongZLH}','{item.qiH}',{item.xuH},{stock.wuLBM},{PORC},'{stock.tuhao}','{stock.guige}')";
 
                             cmd.CommandText = sql;
                             result = cmd.ExecuteNonQuery();
@@ -618,7 +620,7 @@ namespace BOM.Models
                         }
 
                         // 更新投料采购下达  touLCGXD
-                        sql = $"select count(wuLBM) from touLCGXD where gongZLH = {item.gongZLH} and qiH = {item.qiH} and wuLBM = {stock.wuLBM}";
+                        sql = $"select count(wuLBM) from touLCGXD where gongZLH = '{item.gongZLH}' and qiH = '{item.qiH}' and wuLBM = {stock.wuLBM}";
                         cmd.CommandText = sql;
                         try
                         {
@@ -627,17 +629,17 @@ namespace BOM.Models
                             {
                                 if (option == 1 || option == 3)//重排，预重排 覆盖原记录计划数量的值
                                 {
-                                    sql = $"update touLCGXD set queJShL = {PORC}， chunJHQJ = 0.00， leiJXDShL = 0.00 where gongZLH = {item.gongZLH} and qiH = {item.qiH} and wuLBM = {stock.wuLBM}";
+                                    sql = $"update touLCGXD set queJShL = {PORC}， chunJHQJ = 0.00， leiJXDShL = 0.00 where gongZLH = '{item.gongZLH}' and qiH = '{item.qiH}' and wuLBM = {stock.wuLBM}";
                                 }
                                 else//续排 在原记录基础上累加??
                                 {
-                                    sql = $"update touLCGXD set queJShL = queJShL + {PORC} where gongZLH = {item.gongZLH} and qiH = {item.qiH} and wuLBM = {stock.wuLBM}";
+                                    sql = $"update touLCGXD set queJShL = queJShL + {PORC} where gongZLH = '{item.gongZLH}' and qiH = '{item.qiH}' and wuLBM = {stock.wuLBM}";
                                 }
 
                             }
                             else//找不到则登记新记录:缺件数量=PORC ?? 纯计划缺件取值待定
                             {
-                                sql = $"insert into touLCGXD (wuLBM,queJShL, chunJHQJ,qiH,gongZLH,shengChXSh，touLBSh) values ({stock.wuLBM},{PORC},0.00,{item.qiH},{item.gongZLH},{stock.shengChXSh},{stock.touLBSh})";
+                                sql = $"insert into touLCGXD (wuLBM,queJShL, chunJHQJ,qiH,gongZLH,shengChXSh，touLBSh) values ({stock.wuLBM},{PORC},0.00,'{item.qiH}','{item.gongZLH}','{stock.shengChXSh}',{stock.touLBSh})";
                             }
                             cmd.CommandText = sql;
                             result = cmd.ExecuteNonQuery();
@@ -656,7 +658,7 @@ namespace BOM.Models
 
                     case "2"://外协
                              //外协出库准备单主表waiXChKZhBDZB  ??
-                        sql = $"select count(wuLBM) from waiXChKZhBDZB where gongZLH = {item.gongZLH} and qiH = {item.qiH} and xuH = {item.xuH} and wuLBM = {stock.wuLBM}";
+                        sql = $"select count(wuLBM) from waiXChKZhBDZB where gongZLH = '{item.gongZLH}' and qiH = '{item.qiH}' and xuH = {item.xuH} and wuLBM = {stock.wuLBM}";
                         cmd.CommandText = sql;
                         try
                         {
@@ -666,7 +668,7 @@ namespace BOM.Models
                                 if (option == 1 || option == 3)//重排，预重排 覆盖原记录计划数量的值
                                 {
                                     //
-                                    sql = $"delete from waiXChKZhBDZB where gongZLH = {item.gongZLH} and qiH = {item.qiH} and xuH = {item.xuH} and wuLBM = {stock.wuLBM} ";
+                                    sql = $"delete from waiXChKZhBDZB where gongZLH = '{item.gongZLH}' and qiH = '{item.qiH}' and xuH = {item.xuH} and wuLBM = {stock.wuLBM} ";
                                 }
                                 else//续排 报错??
                                 {
@@ -676,7 +678,7 @@ namespace BOM.Models
 
                             }
 
-                            sql = sql + $"insert into waiXChKZhBDZB (gongZLH, qiH, xuH, wuLBM, tuH, guiG ) values ({item.gongZLH},{item.qiH},{item.xuH},{stock.wuLBM},{stock.tuhao},{stock.guige})";
+                            sql = sql + $"insert into waiXChKZhBDZB (gongZLH, qiH, xuH, wuLBM, tuH, guiG ) values ('{item.gongZLH}','{item.qiH}',{item.xuH},{stock.wuLBM},'{stock.tuhao}','{stock.guige}')";
 
                             cmd.CommandText = sql;
                             result = cmd.ExecuteNonQuery();
@@ -693,7 +695,7 @@ namespace BOM.Models
                         }
 
                         //外协出库准备单从表 waiXChKZhBDCB
-                        sql = $"select count(wuLBM) from waiXChKZhBDCB where gongZLH = {item.gongZLH} and qiH = {item.qiH} and xuH = {item.xuH} and wuLBM = {stock.wuLBM}";
+                        sql = $"select count(wuLBM) from waiXChKZhBDCB where gongZLH = '{item.gongZLH}' and qiH = '{item.qiH}' and xuH = {item.xuH} and wuLBM = {stock.wuLBM}";
                         cmd.CommandText = sql;
                         try
                         {
@@ -703,7 +705,7 @@ namespace BOM.Models
                                 if (option == 1 || option == 3)//重排，预重排 覆盖原记录计划数量的值
                                 {
                                     //
-                                    sql = $"delete from waiXChKZhBDCB where gongZLH = {item.gongZLH} and qiH = {item.qiH} and xuH = {item.xuH} and wuLBM = {stock.wuLBM} ";
+                                    sql = $"delete from waiXChKZhBDCB where gongZLH = '{item.gongZLH}' and qiH = '{item.qiH}' and xuH = {item.xuH} and wuLBM = {stock.wuLBM} ";
                                 }
                                 else//续排 报错??
                                 {
@@ -713,7 +715,7 @@ namespace BOM.Models
 
                             }
 
-                            sql = sql + $"insert into waiXChKZhBDCB (gongZLH, qiH, xuH, wuLBM, tuH, guiG, jiHShL ) values ({item.gongZLH},{item.qiH},{item.xuH},{stock.wuLBM},{stock.tuhao},{stock.guige},{PORC})";
+                            sql = sql + $"insert into waiXChKZhBDCB (gongZLH, qiH, xuH, wuLBM, tuH, guiG, jiHShL ) values ('{item.gongZLH}','{item.qiH}',{item.xuH},{stock.wuLBM},'{stock.tuhao}','{stock.guige}',{PORC})";
 
                             cmd.CommandText = sql;
                             result = cmd.ExecuteNonQuery();
@@ -731,7 +733,7 @@ namespace BOM.Models
                         break;
                     case "3"://半成品
                              //工序转移准备单主表 gongXZhYZhBDZhB
-                        sql = $"select count(wuLBM) from gongXZhYZhBDZhB where gongZLH = {item.gongZLH} and qiH = {item.qiH} and wuLBM = {stock.wuLBM}";
+                        sql = $"select count(wuLBM) from gongXZhYZhBDZhB where gongZLH = '{item.gongZLH}' and qiH = '{item.qiH}' and wuLBM = {stock.wuLBM}";
                         cmd.CommandText = sql;
                         try
                         {
@@ -741,7 +743,7 @@ namespace BOM.Models
                                 if (option == 1 || option == 3)//重排，预重排 覆盖原记录计划数量的值
                                 {
                                     //?? 给哪些字段赋值
-                                    sql = $"delete from gongXZhYZhBDZhB where gongZLH = {item.gongZLH} and qiH = {item.qiH} and wuLBM = {stock.wuLBM} ";
+                                    sql = $"delete from gongXZhYZhBDZhB where gongZLH = '{item.gongZLH}' and qiH = '{item.qiH}' and wuLBM = {stock.wuLBM} ";
                                 }
                                 else//续排 报错??应该是查到续排前有重复的领号，期号，序号的记录就报错
                                 {
@@ -759,7 +761,7 @@ namespace BOM.Models
                                 chanPMCh = stock.wuLBM.ToString().Substring(0, pos);
                             }
 
-                            sql = sql + $"insert into gongXZhYZhBDZhB (wuLBM,chanPMCh，gongXBSh) values ({stock.wuLBM},{chanPMCh}，{stock.zum})";
+                            sql = sql + $"insert into gongXZhYZhBDZhB (wuLBM,chanPMCh，gongXBSh) values ({stock.wuLBM},'{chanPMCh}'，{stock.zum})";
 
                             cmd.CommandText = sql;
                             result = cmd.ExecuteNonQuery();
@@ -776,7 +778,7 @@ namespace BOM.Models
                         }
 
                         //工序转移准备单从表 gongXZhYZhBDCB
-                        sql = $"select count(wuLBM) from gongXZhYZhBDCB where gongZLH = {item.gongZLH} and qiH = {item.qiH} and xuH = {item.xuH} and wuLBM = {stock.wuLBM}";
+                        sql = $"select count(wuLBM) from gongXZhYZhBDCB where gongZLH = '{item.gongZLH}' and qiH = '{item.qiH}' and xuH = {item.xuH} and wuLBM = {stock.wuLBM}";
                         cmd.CommandText = sql;
                         try
                         {
@@ -786,7 +788,7 @@ namespace BOM.Models
                                 if (option == 1 || option == 3)//重排，预重排 覆盖原记录计划数量的值
                                 {
                                     //
-                                    sql = $"delete from gongXZhYZhBDCB where gongZLH = {item.gongZLH} and qiH = {item.qiH} and xuH = {item.xuH} and wuLBM = {stock.wuLBM} ";
+                                    sql = $"delete from gongXZhYZhBDCB where gongZLH = '{item.gongZLH}' and qiH = '{item.qiH}' and xuH = {item.xuH} and wuLBM = {stock.wuLBM} ";
                                 }
                                 else//续排 报错??
                                 {
@@ -796,7 +798,7 @@ namespace BOM.Models
 
                             }
 
-                            sql = sql + $"insert into gongXZhYZhBDCB (gongZLH, qiH, xuH, wuLBM, jiHShL,tuH, guiG ) values ({item.gongZLH},{item.qiH},{item.xuH},{stock.wuLBM},{PORC},{stock.tuhao},{stock.guige})";
+                            sql = sql + $"insert into gongXZhYZhBDCB (gongZLH, qiH, xuH, wuLBM, jiHShL,tuH, guiG ) values ('{item.gongZLH}','{item.qiH}',{item.xuH},{stock.wuLBM},{PORC},'{stock.tuhao}','{stock.guige}')";
 
                             cmd.CommandText = sql;
                             result = cmd.ExecuteNonQuery();
@@ -831,7 +833,7 @@ namespace BOM.Models
         //将BOM表中的一个BOM树递归登记到列表bomTree中
         private bool AddBomItem(long wuLBM, string qiH, string gongZLH)
         {
-            long tmpWuLBM = 0l;
+            long tmpWuLBM = 0L;
             Bom bom = new Bom();
             SqlDataReader reader = null;
 
@@ -844,7 +846,8 @@ namespace BOM.Models
                 reader = cmd.ExecuteReader();
                 if (reader.HasRows)
                 {
-                    tmpWuLBM = Convert.ToInt64(reader["daiWLBMh"].ToString());
+                    reader.Read();
+                    tmpWuLBM = Convert.ToInt64(reader["daiWLBM"].ToString());
                 }
                 else {
                     tmpWuLBM = wuLBM;
@@ -853,7 +856,7 @@ namespace BOM.Models
             }
             catch (Exception e)
             {
-                log.Error(string.Format($"查询代用件计划表失败，SQL={sql}\nError{e.StackTrace}"));
+                log.Error(string.Format($"查询代用件计划表失败，SQL=[{sql}]\nError{e.StackTrace}"));
                 return false;
             }
             finally
@@ -869,6 +872,7 @@ namespace BOM.Models
                 reader = cmd.ExecuteReader();
                 if (reader.HasRows)
                 {
+                    reader.Read();
                     bom.materielIdentfication = tmpWuLBM;
                     bom.tmpId = Convert.ToInt64(reader["tmpId"].ToString());
                     bom.CTmpId = Convert.ToInt64(reader["CTmpId"].ToString());
@@ -879,13 +883,13 @@ namespace BOM.Models
                 }
                 else
                 {
-                    log.Error(string.Format($"未在BOM表中查到相关记录，SQL={sql}\n"));
+                    log.Error(string.Format($"未在BOM表中查到相关记录，SQL=[{sql}]\n"));
                     return false;
                 }
             }
             catch (Exception e)
             {
-                log.Error(string.Format($"查询BOM失败，SQL={sql}\nError{e.StackTrace}"));
+                log.Error(string.Format($"查询BOM失败，SQL=[{sql}]\nError{e.StackTrace}"));
                 return false;
             }
             finally
@@ -897,7 +901,8 @@ namespace BOM.Models
             bomTree.Add(bom);
 
             //查找当前物料的子物料
-            sql = $"select * from BOM where materielIdentfication = {wuLBM} ";
+            List<long> mid_list = new List<long>();
+            sql = $"select Cmid from BOM where materielIdentfication = {wuLBM} ";
             cmd.CommandText = sql;
             try
             {
@@ -907,12 +912,18 @@ namespace BOM.Models
 
                     while (reader.Read())
                     {
-                        var childMId = Convert.ToInt64(reader["CmId"].ToString());
-                        if (!AddBomItem(childMId,qiH,gongZLH))
+                        mid_list.Add( Convert.ToInt64(reader["CmId"].ToString()));
+                    }
+                    reader.Close();
+
+                    foreach (var mid in mid_list)
+                    {
+                        if (!AddBomItem(mid, qiH, gongZLH))
                         {
                             return false;
                         }
                     }
+
                 }
                 else
                 {
@@ -921,12 +932,12 @@ namespace BOM.Models
             }
             catch (Exception e)
             {
-                log.Error(string.Format($"查询BOM失败，SQL={sql}\nError{e.StackTrace}"));
+                log.Error(string.Format($"查询BOM失败，SQL=[{sql}]\nError{e.StackTrace}"));
                 return false;
             }
             finally
             {
-                reader.Close();
+                reader?.Close();
             }
 
             return true;

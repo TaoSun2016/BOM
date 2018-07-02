@@ -1501,7 +1501,7 @@ namespace BOM.Models
         public long MaterielId { get; set; }
         public int rlSeqNo { get; set; }
         public decimal Count { get; set; }
-        public int peiTNo { get; set; }
+        public long peiTNo { get; set; }
         public List<TempletAttribute> Attributes { get; set; }
         public NodeInfo()
         {

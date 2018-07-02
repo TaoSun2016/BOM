@@ -383,15 +383,16 @@ namespace BOM.Models
         {
             decimal multiple = 0.00m;       //当前物料不足的数量，也是其子物料需要乘以的倍数
             decimal surplus = 0.00m;        //当前剩余物料的数量
+            decimal shuL = item.shuL;
 
-            
+
             var stock = stocks.Find(m => m.wuLBM == item.wuLBM);
             stock.flag = seqno;
             surplus = stock.PAB - stock.shuL;//当前剩余的数量
-            stock.shuL += item.shuL;//累计实际需要的数量
+            stock.shuL += shuL;//累计实际需要的数量
 
             //当前剩余大于本次所需，不需进一步处理
-            if (surplus - item.shuL > -0.00005m)
+            if (surplus - shuL > -0.00005m)
             {
                 return;
             }
@@ -399,11 +400,11 @@ namespace BOM.Models
             //当前没有剩余
             if (surplus < 0.00005m)
             {
-                multiple = item.shuL;
+                multiple = shuL;
             }//当前有剩余，但不足本次所需
-            else if (surplus - item.shuL < 0.00005m)
+            else if (surplus - shuL < 0.00005m)
             {
-                multiple = item.shuL - surplus;
+                multiple = shuL - surplus;
             }
 
             //从BOM树种找到子物料，再逐个遍历，累计更新stacks相应物料的需求数量shuL
@@ -512,7 +513,7 @@ namespace BOM.Models
                             {
                                 if (option == 1 || option == 3)//重排，预重排 覆盖原记录计划数量的值
                                 {
-                                    sql = $"update caiGShJB001 set jiHShL = {PORC}， wanChShL = 0.00， leiJXDShL = 0.00， jinE = 0.00， heJJE = 0.00 where wuLBM = {stock.wuLBM}";
+                                    sql = $"update caiGShJB001 set jiHShL = {PORC}, wanChShL = 0.00, leiJXDShL = 0.00, jinE = 0.00, heJJE = 0.00 where wuLBM = {stock.wuLBM}";
                                 }
                                 else//续排 在原记录基础上累加 完成数量wanChShL和累计下达数量leiJXDShL如何赋值??
                                 {
@@ -567,7 +568,7 @@ namespace BOM.Models
                                 chanPMCh = stock.wuLBM.ToString().Substring(0, pos);
                             }
 
-                            sql = sql + $"insert into gongXZhYZhBDZhB (wuLBM,chanPMCh，gongXBSh) values ({stock.wuLBM},'{chanPMCh}'，{stock.zum})";
+                            sql = sql + $"insert into gongXZhYZhBDZhB (wuLBM,chanPMCh,gongXBSh) values ({stock.wuLBM},'{chanPMCh}',{stock.zum})";
 
                             cmd.CommandText = sql;
                             result = cmd.ExecuteNonQuery();
@@ -629,7 +630,7 @@ namespace BOM.Models
                             {
                                 if (option == 1 || option == 3)//重排，预重排 覆盖原记录计划数量的值
                                 {
-                                    sql = $"update touLCGXD set queJShL = {PORC}， chunJHQJ = 0.00， leiJXDShL = 0.00 where gongZLH = '{item.gongZLH}' and qiH = '{item.qiH}' and wuLBM = {stock.wuLBM}";
+                                    sql = $"update touLCGXD set queJShL = {PORC}, chunJHQJ = 0.00, leiJXDShL = 0.00 where gongZLH = '{item.gongZLH}' and qiH = '{item.qiH}' and wuLBM = {stock.wuLBM}";
                                 }
                                 else//续排 在原记录基础上累加??
                                 {
@@ -639,7 +640,7 @@ namespace BOM.Models
                             }
                             else//找不到则登记新记录:缺件数量=PORC ?? 纯计划缺件取值待定
                             {
-                                sql = $"insert into touLCGXD (wuLBM,queJShL, chunJHQJ,qiH,gongZLH,shengChXSh，touLBSh) values ({stock.wuLBM},{PORC},0.00,'{item.qiH}','{item.gongZLH}','{stock.shengChXSh}',{stock.touLBSh})";
+                                sql = $"insert into touLCGXD (wuLBM,queJShL, chunJHQJ,qiH,gongZLH,shengChXSh,touLBSh) values ({stock.wuLBM},{PORC},0.00,'{item.qiH}','{item.gongZLH}','{stock.shengChXSh}',{stock.touLBSh})";
                             }
                             cmd.CommandText = sql;
                             result = cmd.ExecuteNonQuery();
@@ -761,7 +762,7 @@ namespace BOM.Models
                                 chanPMCh = stock.wuLBM.ToString().Substring(0, pos);
                             }
 
-                            sql = sql + $"insert into gongXZhYZhBDZhB (wuLBM,chanPMCh，gongXBSh) values ({stock.wuLBM},'{chanPMCh}'，{stock.zum})";
+                            sql = sql + $"insert into gongXZhYZhBDZhB (wuLBM,chanPMCh,gongXBSh) values ({stock.wuLBM},'{chanPMCh}',{stock.zum})";
 
                             cmd.CommandText = sql;
                             result = cmd.ExecuteNonQuery();
@@ -872,14 +873,15 @@ namespace BOM.Models
                 reader = cmd.ExecuteReader();
                 if (reader.HasRows)
                 {
+                    
                     reader.Read();
-                    bom.materielIdentfication = tmpWuLBM;
+                    bom.materielIdentfication = Convert.ToInt64(reader["materielIdentfication"].ToString());
                     bom.tmpId = Convert.ToInt64(reader["tmpId"].ToString());
                     bom.CTmpId = Convert.ToInt64(reader["CTmpId"].ToString());
                     bom.CmId = Convert.ToInt64(reader["CmId"].ToString());
                     bom.CNum = Convert.ToDecimal(reader["CNum"].ToString());
                     bom.rlSeqNo = Convert.ToInt32(reader["rlSeqNo"].ToString());
-                    bom.peiTNo = Convert.ToInt32(reader["peiTNo"].ToString());
+                    bom.peiTNo = Convert.ToInt64(reader["peiTNo"].ToString());
                 }
                 else
                 {
@@ -1031,7 +1033,7 @@ namespace BOM.Models
         public long CTmpId { get; set; }        //物料模板ID
         public decimal CNum { get; set; }
         public int rlSeqNo { get; set; }
-        public int peiTNo { get; set; }         //配套标识
+        public long peiTNo { get; set; }         //配套标识
         public long substitute { get; set; }    //替代物料编码
     }
 }

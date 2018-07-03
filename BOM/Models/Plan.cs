@@ -50,7 +50,7 @@ namespace BOM.Models
                 i++;
                 if (option == 2)//续排
                 {
-                    if (!GetPlanCount(item))
+                    if (!GetTableFlag(item))
                     {
                         log.Error(string.Format($"获取续排次数失败\n"));
                         return false;
@@ -105,56 +105,7 @@ namespace BOM.Models
             return true;
         }
 
-        private bool GetPlanCount(PlanItem item)
-        {
-            int Count = 0;
 
-            sql = $"select count(*) from switch where gongZLH='{item.gongZLH}' and qiH='{item.qiH}' and xuH={item.xuH}";
-            cmd.CommandText = sql;
-            try
-            {
-                Count = Convert.ToInt32(cmd.ExecuteScalar());               
-            }
-            catch (Exception e)
-            {
-                log.Error(string.Format($"select switch error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                return false;
-            }
-
-            if (Count == 0)
-            {
-                tableFlag = 0;
-                sql = $"insert into switch (gongZLH, qiH, xuH, ciSh) values ('{item.gongZLH}','{item.qiH}' , {item.xuH}, 0)";
-                cmd.CommandText = sql;
-                try
-                {
-                   cmd.ExecuteNonQuery();
-                }
-                catch (Exception e)
-                {
-                    log.Error(string.Format($"insert table switch error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                    return false;
-                }
-                return true;
-            }
-
-
-
-            sql = $"select ciSh from switch where gongZLH='{item.gongZLH}' and qiH='{item.qiH}' and xuH={item.xuH}";
-            cmd.CommandText = sql;
-            try
-            {
-                Count = Convert.ToInt32(cmd.ExecuteScalar());
-                //tableFlag=0时，续排登记缺件表1，PAB登记daefault._store_1,否则登记缺件表，PAB登记daefault._store_
-                tableFlag = Count % 2;  
-            }
-            catch (Exception e)
-            {
-                log.Error(string.Format($"select switch error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                return false;
-            }
-            return true;
-        }
 
         private bool InitData()
         {
@@ -273,6 +224,179 @@ namespace BOM.Models
             }
         }
 
+        //给全局变量tableFlag赋值：
+        //tableFlag=0时，续排登记缺件表1，PAB登记daefault._store_1,否则登记缺件表，PAB登记daefault._store_
+        private bool GetTableFlag(PlanItem item)
+        {
+            int Count = 0;
+
+            sql = $"select count(*) from switch where gongZLH='{item.gongZLH}' and qiH='{item.qiH}' and xuH={item.xuH}";
+            cmd.CommandText = sql;
+            try
+            {
+                Count = Convert.ToInt32(cmd.ExecuteScalar());
+            }
+            catch (Exception e)
+            {
+                log.Error(string.Format($"select switch error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                return false;
+            }
+
+            if (Count == 0)
+            {
+                tableFlag = 0;
+                sql = $"insert into switch (gongZLH, qiH, xuH, ciSh) values ('{item.gongZLH}','{item.qiH}' , {item.xuH}, 0)";
+                cmd.CommandText = sql;
+                try
+                {
+                    cmd.ExecuteNonQuery();
+                }
+                catch (Exception e)
+                {
+                    log.Error(string.Format($"insert table switch error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                    return false;
+                }
+                return true;
+            }
+
+            sql = $"select ciSh from switch where gongZLH='{item.gongZLH}' and qiH='{item.qiH}' and xuH={item.xuH}";
+            cmd.CommandText = sql;
+            try
+            {
+                Count = Convert.ToInt32(cmd.ExecuteScalar());
+                //tableFlag=0时，续排登记缺件表1，PAB登记daefault._store_1,否则登记缺件表，PAB登记daefault._store_
+                tableFlag = Count % 2;
+            }
+            catch (Exception e)
+            {
+                log.Error(string.Format($"select switch error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                return false;
+            }
+            return true;
+        }
+
+        //初始化BOM树列表bomTree
+        private bool InitBomTree(PlanItem item)
+        {
+            bomTree.Clear();
+            return AddBomItem(item.wuLBM, item.qiH, item.gongZLH);
+        }
+
+        //将BOM表中的一个BOM树递归登记到列表bomTree中
+        private bool AddBomItem(long wuLBM, string qiH, string gongZLH)
+        {
+            long tmpWuLBM = 0L;
+            Bom bom = new Bom();
+            SqlDataReader reader = null;
+
+
+            //查找代用件
+            sql = $"select daiWLBM from daiYJJHZhB z, daiYJJHCB c where c.zhuBBSh = z.biaoSh and c.yuanWLBM = z.wuLBM and c.yuanWLTH = z.tuH and c.yuanWLGG=z.GuiG and z.qiH='{qiH}' and z.gongZLH = '{gongZLH}' and z.wuLBM={wuLBM}";
+            cmd.CommandText = sql;
+            try
+            {
+                reader = cmd.ExecuteReader();
+                if (reader.HasRows)
+                {
+                    reader.Read();
+                    tmpWuLBM = Convert.ToInt64(reader["daiWLBM"].ToString());
+                }
+                else
+                {
+                    tmpWuLBM = wuLBM;
+                }
+
+            }
+            catch (Exception e)
+            {
+                log.Error(string.Format($"查询代用件计划表失败，SQL=[{sql}]\nError{e.StackTrace}"));
+                return false;
+            }
+            finally
+            {
+                reader?.Close();
+            }
+
+            //查找当前物料信息 Cmid = tmpWuLBM
+            sql = $"select * from BOM where CmId = {tmpWuLBM}";
+            cmd.CommandText = sql;
+            try
+            {
+                reader = cmd.ExecuteReader();
+                if (reader.HasRows)
+                {
+
+                    reader.Read();
+                    bom.materielIdentfication = Convert.ToInt64(reader["materielIdentfication"].ToString());
+                    bom.tmpId = Convert.ToInt64(reader["tmpId"].ToString());
+                    bom.CTmpId = Convert.ToInt64(reader["CTmpId"].ToString());
+                    bom.CmId = Convert.ToInt64(reader["CmId"].ToString());
+                    bom.CNum = Convert.ToDecimal(reader["CNum"].ToString());
+                    bom.rlSeqNo = Convert.ToInt32(reader["rlSeqNo"].ToString());
+                    bom.peiTNo = Convert.ToInt64(reader["peiTNo"].ToString());
+                }
+                else
+                {
+                    log.Error(string.Format($"未在BOM表中查到相关记录，SQL=[{sql}]\n"));
+                    return false;
+                }
+            }
+            catch (Exception e)
+            {
+                log.Error(string.Format($"查询BOM失败，SQL=[{sql}]\nError{e.StackTrace}"));
+                return false;
+            }
+            finally
+            {
+                reader.Close();
+            }
+
+            //登记物料树
+            bomTree.Add(bom);
+
+            //查找当前物料的子物料
+            List<long> mid_list = new List<long>();
+            sql = $"select Cmid from BOM where materielIdentfication = {wuLBM} ";
+            cmd.CommandText = sql;
+            try
+            {
+                reader = cmd.ExecuteReader();
+                if (reader.HasRows)
+                {
+
+                    while (reader.Read())
+                    {
+                        mid_list.Add(Convert.ToInt64(reader["CmId"].ToString()));
+                    }
+                    reader.Close();
+
+                    foreach (var mid in mid_list)
+                    {
+                        if (!AddBomItem(mid, qiH, gongZLH))
+                        {
+                            return false;
+                        }
+                    }
+
+                }
+                else
+                {
+                    return true;
+                }
+            }
+            catch (Exception e)
+            {
+                log.Error(string.Format($"查询BOM失败，SQL=[{sql}]\nError{e.StackTrace}"));
+                return false;
+            }
+            finally
+            {
+                reader?.Close();
+            }
+
+            return true;
+
+        }
         private bool HandlePlanFlag(PlanItem item)
         {
             if (option == 1 || option == 3 )//重排，预重排
@@ -825,127 +949,7 @@ namespace BOM.Models
             return true;
         }
 
-        //初始化BOM树列表bomTree
-        private bool InitBomTree(PlanItem item)
-        {
-            bomTree.Clear();
-            return AddBomItem(item.wuLBM, item.qiH, item.gongZLH);
-        }
 
-        //将BOM表中的一个BOM树递归登记到列表bomTree中
-        private bool AddBomItem(long wuLBM, string qiH, string gongZLH)
-        {
-            long tmpWuLBM = 0L;
-            Bom bom = new Bom();
-            SqlDataReader reader = null;
-
-
-            //查找代用件
-            sql = $"select daiWLBM from daiYJJHZhB z, daiYJJHCB c where c.zhuBBSh = z.biaoSh and c.yuanWLBM = z.wuLBM and c.yuanWLTH = z.tuH and c.yuanWLGG=z.GuiG and z.qiH='{qiH}' and z.gongZLH = '{gongZLH}' and z.wuLBM={wuLBM}";
-            cmd.CommandText = sql;
-            try
-            {
-                reader = cmd.ExecuteReader();
-                if (reader.HasRows)
-                {
-                    reader.Read();
-                    tmpWuLBM = Convert.ToInt64(reader["daiWLBM"].ToString());
-                }
-                else {
-                    tmpWuLBM = wuLBM;
-                }
-
-            }
-            catch (Exception e)
-            {
-                log.Error(string.Format($"查询代用件计划表失败，SQL=[{sql}]\nError{e.StackTrace}"));
-                return false;
-            }
-            finally
-            {
-                reader?.Close();
-            }
-
-            //查找当前物料信息 Cmid = tmpWuLBM
-            sql = $"select * from BOM where CmId = {tmpWuLBM}";
-            cmd.CommandText = sql;
-            try
-            {
-                reader = cmd.ExecuteReader();
-                if (reader.HasRows)
-                {
-                    
-                    reader.Read();
-                    bom.materielIdentfication = Convert.ToInt64(reader["materielIdentfication"].ToString());
-                    bom.tmpId = Convert.ToInt64(reader["tmpId"].ToString());
-                    bom.CTmpId = Convert.ToInt64(reader["CTmpId"].ToString());
-                    bom.CmId = Convert.ToInt64(reader["CmId"].ToString());
-                    bom.CNum = Convert.ToDecimal(reader["CNum"].ToString());
-                    bom.rlSeqNo = Convert.ToInt32(reader["rlSeqNo"].ToString());
-                    bom.peiTNo = Convert.ToInt64(reader["peiTNo"].ToString());
-                }
-                else
-                {
-                    log.Error(string.Format($"未在BOM表中查到相关记录，SQL=[{sql}]\n"));
-                    return false;
-                }
-            }
-            catch (Exception e)
-            {
-                log.Error(string.Format($"查询BOM失败，SQL=[{sql}]\nError{e.StackTrace}"));
-                return false;
-            }
-            finally
-            {
-                reader.Close();
-            }
-
-            //登记物料树
-            bomTree.Add(bom);
-
-            //查找当前物料的子物料
-            List<long> mid_list = new List<long>();
-            sql = $"select Cmid from BOM where materielIdentfication = {wuLBM} ";
-            cmd.CommandText = sql;
-            try
-            {
-                reader = cmd.ExecuteReader();
-                if (reader.HasRows)
-                {
-
-                    while (reader.Read())
-                    {
-                        mid_list.Add( Convert.ToInt64(reader["CmId"].ToString()));
-                    }
-                    reader.Close();
-
-                    foreach (var mid in mid_list)
-                    {
-                        if (!AddBomItem(mid, qiH, gongZLH))
-                        {
-                            return false;
-                        }
-                    }
-
-                }
-                else
-                {
-                    return true;
-                }
-            }
-            catch (Exception e)
-            {
-                log.Error(string.Format($"查询BOM失败，SQL=[{sql}]\nError{e.StackTrace}"));
-                return false;
-            }
-            finally
-            {
-                reader?.Close();
-            }
-
-            return true;
-
-        }
 
 
         #region IDisposable Support

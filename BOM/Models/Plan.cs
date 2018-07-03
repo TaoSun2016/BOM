@@ -186,7 +186,7 @@ namespace BOM.Models
                             item.SOR = Convert.ToDecimal(tmp == string.Empty?"0.00":tmp);          
 
                             //上期库存数量
-                            if (option == 1 || option == 3)//续排，预续排
+                            if (option == 2 || option == 4)//续排，预续排
                             {
                                 if (tableFlag == 0)//本次从_STORE_获取值，计算后的新值登记到_STORE_1中
                                 {
@@ -248,7 +248,7 @@ namespace BOM.Models
                 //获取每个物料的库存数量
                 foreach (var item in stocks)
                 {
-                    sql = $"select sum(kuCSh) from kuCShJB001 where wuLBM = {item.wuLBM}";
+                    sql = $"select isnull(sum(kuCSh),0.0000) from kuCShJB001 where wuLBM = {item.wuLBM}";
                     cmd.CommandText = sql;
                     cmd.Connection = connection;
                     try
@@ -264,6 +264,7 @@ namespace BOM.Models
 
                     if (option == 1 || option == 3)//重排，预重排
                     {
+                        //重排：上期库存=在途+在库
                         item.PAB = item.SOR + item.OH;
                     }
                 }

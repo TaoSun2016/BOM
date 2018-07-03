@@ -16,7 +16,7 @@ namespace BOM.Models
 
         private int option;
 
-        //tableFlag=0时，续排登记缺件表1，PAB登记daefault._store1_,否则登记缺件表，PAB登记daefault._store_
+        //tableFlag=0时，续排登记缺件表1，PAB登记daefault._store_1,否则登记缺件表，PAB登记daefault._store_
         private int tableFlag = 0;
         string sql = null;
         List<Stock> stocks = new List<Stock>();
@@ -145,7 +145,7 @@ namespace BOM.Models
             try
             {
                 Count = Convert.ToInt32(cmd.ExecuteScalar());
-                //tableFlag=0时，续排登记缺件表1，PAB登记daefault._store1_,否则登记缺件表，PAB登记daefault._store_
+                //tableFlag=0时，续排登记缺件表1，PAB登记daefault._store_1,否则登记缺件表，PAB登记daefault._store_
                 tableFlag = Count % 2;  
             }
             catch (Exception e)
@@ -186,15 +186,15 @@ namespace BOM.Models
                             item.SOR = Convert.ToDecimal(tmp == string.Empty?"0.00":tmp);          
 
                             //上期库存数量
-                            if (option == 1 || option == 3)//续拍，预续排
+                            if (option == 1 || option == 3)//续排，预续排
                             {
-                                if (tableFlag == 0)//本次从_STORE_获取值，计算后的新值登记到_STORE1_中
+                                if (tableFlag == 0)//本次从_STORE_获取值，计算后的新值登记到_STORE_1中
                                 {
                                     tmp = dataReader["_STORE_"].ToString();
                                     item.PAB = Convert.ToDecimal(tmp == string.Empty ? "0.00" : tmp); 
                                 }
-                                else {//本次从_STORE1_获取值，计算后的新值登记到_STORE_中
-                                    tmp = dataReader["_STORE1_"].ToString();
+                                else {//本次从_STORE_1获取值，计算后的新值登记到_STORE_中
+                                    tmp = dataReader["_STORE_1"].ToString();
                                     item.PAB = Convert.ToDecimal(tmp == string.Empty ? "0.00" : tmp);
                                 }
                             }
@@ -321,7 +321,7 @@ namespace BOM.Models
                 var fieldName = "_STORE_";
                 if ((option == 2 || option == 4)&&tableFlag == 0)//重排
                 {
-                    fieldName = "_STORE1_";
+                    fieldName = "_STORE_1";
                 }
                
                 sb.Append($"UPDATE DeafaultAttr SET [{fieldName}] = {item.PAB} WHERE materielIdentfication = {item.wuLBM} ");
@@ -465,14 +465,14 @@ namespace BOM.Models
                     case 1://重排
                         tableName = "ullageTempSingle";
                         break;
-                    case 2://续拍
+                    case 2://续排
                         tableName = (tableFlag == 0) ? "ullageTempSingle2" : "ullageTempSingle";
                         break;
                     case 3://预重排
                         tableName = "ullageTempSingleTemp";
                         break;
                     case 4://预续排 
-                        tableName = "ullageTempSingleTemp2";
+                        tableName = "ullageTempSingle2Temp";
                         break;
                     default:
                         break;

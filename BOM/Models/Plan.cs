@@ -444,7 +444,7 @@ namespace BOM.Models
                 iterator++;
 
                 var fieldName = "_STORE_";
-                if ((option == 2 || option == 4)&&tableFlag == 0)//重排
+                if ((option == 2 || option == 4)&&tableFlag == 0)//续排且tableFlag为0，则登记—_STORE_1字段
                 {
                     fieldName = "_STORE_1";
                 }
@@ -638,7 +638,7 @@ namespace BOM.Models
                             {
                                 if (option == 1 || option == 3)//重排，预重排 覆盖原记录计划数量的值
                                 {
-                                    sql = $"update caiGShJB001 set jiHShL = {PORC}, wanChShL = 0.00, leiJXDShL = 0.00, jinE = 0.00, heJJE = 0.00 where wuLBM = {stock.wuLBM}";
+                                    sql = $"update caiGShJB001 set jiHShL = {PORC}, wanChShL = 0.00,  jinE = 0.00, heJJE = 0.00 where wuLBM = {stock.wuLBM}";
                                 }
                                 else//续排 在原记录基础上累加 完成数量wanChShL和累计下达数量leiJXDShL如何赋值??
                                 {
@@ -675,12 +675,12 @@ namespace BOM.Models
                             {
                                 if (option == 1 || option == 3)//重排，预重排 覆盖原记录计划数量的值
                                 {
-                                    //?? 给哪些字段赋值
+                                    //根据令号，期号和物料编码删除原记录
                                     sql = $"delete from gongXZhYZhBDZhB where gongZLH = '{item.gongZLH}' and qiH = '{item.qiH}' and wuLBM = {stock.wuLBM} ";
                                 }
-                                else//续排 报错??应该是查到续排前有重复的领号，期号，序号的记录就报错
+                                else//续排 报错
                                 {
-                                    log.Error(string.Format($"续排，物料为自制件，工序转移准备单主表已有记录r\nsql[{sql}]\n"));
+                                    log.Error(string.Format($"续排，物料为自制件，工序转移准备单主表已有记录\nsql[{sql}]\n"));
                                     return false;
                                 }
                             }
@@ -722,9 +722,9 @@ namespace BOM.Models
                                     //
                                     sql = $"delete from gongXZhYZhBDCB where gongZLH = '{item.gongZLH}' and qiH = '{item.qiH}' and xuH = {item.xuH} and wuLBM = {stock.wuLBM} ";
                                 }
-                                else//续排 报错??
+                                else//续排 报错
                                 {
-                                    log.Error(string.Format($"续排，物料为自制件，工序转移准备单从表已有记录r\nsql[{sql}]\n"));
+                                    log.Error(string.Format($"续排，物料为自制件，工序转移准备单从表已有记录\nsql[{sql}]\n"));
                                     return false;
                                 }
                             }
@@ -763,7 +763,7 @@ namespace BOM.Models
                                 }
 
                             }
-                            else//找不到则登记新记录:缺件数量=PORC ?? 纯计划缺件取值待定
+                            else//找不到则登记新记录:缺件数量=PORC
                             {
                                 sql = $"insert into touLCGXD (wuLBM,queJShL, chunJHQJ,qiH,gongZLH,shengChXSh,touLBSh) values ({stock.wuLBM},{PORC},0.00,'{item.qiH}','{item.gongZLH}','{stock.shengChXSh}',{stock.touLBSh})";
                             }
@@ -783,7 +783,7 @@ namespace BOM.Models
                         break;
 
                     case "2"://外协
-                             //外协出库准备单主表waiXChKZhBDZB  ??
+                             //外协出库准备单主表waiXChKZhBDZB
                         sql = $"select count(wuLBM) from waiXChKZhBDZB where gongZLH = '{item.gongZLH}' and qiH = '{item.qiH}' and xuH = {item.xuH} and wuLBM = {stock.wuLBM}";
                         cmd.CommandText = sql;
                         try
@@ -796,7 +796,7 @@ namespace BOM.Models
                                     //
                                     sql = $"delete from waiXChKZhBDZB where gongZLH = '{item.gongZLH}' and qiH = '{item.qiH}' and xuH = {item.xuH} and wuLBM = {stock.wuLBM} ";
                                 }
-                                else//续排 报错??
+                                else//续排 报错
                                 {
                                     log.Error(string.Format($"续排，物料为外协件，外协出库准备单主表已有记录r\nsql[{sql}]\n"));
                                     return false;
@@ -833,7 +833,7 @@ namespace BOM.Models
                                     //
                                     sql = $"delete from waiXChKZhBDCB where gongZLH = '{item.gongZLH}' and qiH = '{item.qiH}' and xuH = {item.xuH} and wuLBM = {stock.wuLBM} ";
                                 }
-                                else//续排 报错??
+                                else//续排 报错
                                 {
                                     log.Error(string.Format($"续排，物料为外协件，外协出库准备单从表已有记录r\nsql[{sql}]\n"));
                                     return false;
@@ -916,9 +916,9 @@ namespace BOM.Models
                                     //
                                     sql = $"delete from gongXZhYZhBDCB where gongZLH = '{item.gongZLH}' and qiH = '{item.qiH}' and xuH = {item.xuH} and wuLBM = {stock.wuLBM} ";
                                 }
-                                else//续排 报错??
+                                else//续排 报错
                                 {
-                                    log.Error(string.Format($"续排，物料为自制件，工序转移准备单从表已有记录r\nsql[{sql}]\n"));
+                                    log.Error(string.Format($"续排，物料为自制件，工序转移准备单从表已有记录\nsql[{sql}]\n"));
                                     return false;
                                 }
 

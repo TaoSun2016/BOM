@@ -4,6 +4,8 @@ using System.Data.SqlClient;
 using System.Linq;
 using System.Text;
 using System.Web;
+using System.Data.Common;
+using BOM.DbAccess;
 
 namespace BOM.Models
 {
@@ -27,12 +29,11 @@ namespace BOM.Models
             StringBuilder condition = new StringBuilder();
 
             log4net.ILog log = log4net.LogManager.GetLogger("RelationMaintainList");
-            SqlConnection sqlConnection = DBConnection.OpenConnection();
-            SqlTransaction sqlTransaction = sqlConnection.BeginTransaction();
-            using (SqlCommand command = new SqlCommand())
+            DbConnection connection = DbUtilities.GetConnection();
+            DbTransaction transaction = connection.BeginTransaction();
+            using (DbCommand command = connection.CreateCommand())
             {
-                command.Connection = sqlConnection;
-                command.Transaction = sqlTransaction;
+                command.Transaction = transaction;
                 foreach (var state in list)
                 {
                     TmpId = state.TmpId;
@@ -55,15 +56,15 @@ namespace BOM.Models
                             catch (Exception e)
                             {
                                 log.Error(string.Format($"Insert into attrpass error!\nsql[{sql}]\nErrMsg[{e.Message}]\nError[{e.StackTrace}]"));
-                                sqlTransaction.Rollback();
-                                DBConnection.CloseConnection(sqlConnection);
+                                transaction.Rollback();
+                                connection.Close();
                                 throw;
                             }
                             if (result == 0)
                             {
                                 log.Error(string.Format($"No data is inserted into attrpass!\nsql[{sql}]\n"));
-                                sqlTransaction.Rollback();
-                                DBConnection.CloseConnection(sqlConnection);
+                                transaction.Rollback();
+                                connection.Close();
                                 throw new Exception("No data is inserted into attrpass!");
                             }
                         }
@@ -155,15 +156,15 @@ namespace BOM.Models
                             catch (Exception e)
                             {
                                 log.Error(string.Format($"Update attrpass error!\nsql[{sql}]\nErrMsg[{e.Message}]Error[{e.StackTrace}]"));
-                                sqlTransaction.Rollback();
-                                DBConnection.CloseConnection(sqlConnection);
+                                transaction.Rollback();
+                                connection.Close();
                                 throw;
                             }
                             if (result == 0)
                             {
                                 log.Error(string.Format($"No data is updated in attrpass!\nsql[{sql}]\n"));
-                                sqlTransaction.Rollback();
-                                DBConnection.CloseConnection(sqlConnection);
+                                transaction.Rollback();
+                                connection.Close();
                                 throw new Exception("No data is updated in attrpass!");
                             }
                         }
@@ -257,15 +258,15 @@ namespace BOM.Models
                             catch (Exception e)
                             {
                                 log.Error(string.Format($"Delete from attrpass error!\nsql[{sql}]\nErrMsg[{e.Message}]Error[{e.StackTrace}]"));
-                                sqlTransaction.Rollback();
-                                DBConnection.CloseConnection(sqlConnection);
+                                transaction.Rollback();
+                                connection.Close();
                                 throw;
                             }
                             if (result == 0)
                             {
                                 log.Error(string.Format($"No data is deleted in attrpass!\nsql[{sql}]\n"));
-                                sqlTransaction.Rollback();
-                                DBConnection.CloseConnection(sqlConnection);
+                                transaction.Rollback();
+                                connection.Close();
                                 throw new Exception("No data is deleted in attrpass!");
                             }
                         }
@@ -287,15 +288,15 @@ namespace BOM.Models
                             catch (Exception e)
                             {
                                 log.Error(string.Format($"Update attrpass sum error!\nsql[{sql}]\nErrMsg[{e.Message}]\nError[{e.StackTrace}]"));
-                                sqlTransaction.Rollback();
-                                DBConnection.CloseConnection(sqlConnection);
+                                transaction.Rollback();
+                                connection.Close();
                                 throw;
                             }
                             if (result == 0)
                             {
                                 log.Error(string.Format($"No data is updated in attrpass!\nsql[{sql}]\n"));
-                                sqlTransaction.Rollback();
-                                DBConnection.CloseConnection(sqlConnection);
+                                transaction.Rollback();
+                                connection.Close();
                                 throw new Exception("No data is updated in attrpass!");
                             }
                         }
@@ -316,15 +317,15 @@ namespace BOM.Models
                             catch (Exception e)
                             {
                                 log.Error(string.Format($"Delete attrpass sum error!\nsql[{sql}]\nErrMsg[{e.Message}]\nError[{e.StackTrace}]"));
-                                sqlTransaction.Rollback();
-                                DBConnection.CloseConnection(sqlConnection);
+                                transaction.Rollback();
+                                connection.Close();
                                 throw;
                             }
                             if (result == 0)
                             {
                                 log.Error(string.Format($"No data is deleted in attrpass!\nsql[{sql}]\n"));
-                                sqlTransaction.Rollback();
-                                DBConnection.CloseConnection(sqlConnection);
+                                transaction.Rollback();
+                                connection.Close();
                                 throw new Exception("No data is deleted in attrpass!");
                             }
                         }
@@ -355,15 +356,15 @@ namespace BOM.Models
                             catch (Exception e)
                             {
                                 log.Error(string.Format(newFlag ? "Insert" : "Update" + $" attrpass default error!\nsql[{sql}]\nErrMsg[{e.Message}]\nError[{e.StackTrace}]"));
-                                sqlTransaction.Rollback();
-                                DBConnection.CloseConnection(sqlConnection);
+                                transaction.Rollback();
+                                connection.Close();
                                 throw;
                             }
                             if (result == 0)
                             {
                                 log.Error(string.Format("No data is " + (newFlag ? "Inserted" : "Updated") + $" in attrpass!\nsql[{sql}]\n"));
-                                sqlTransaction.Rollback();
-                                DBConnection.CloseConnection(sqlConnection);
+                                transaction.Rollback();
+                                connection.Close();
                                 throw new Exception("No data is " + (newFlag ? "Inserted" : "Updated") + $" in attrpass!");
                             }
                         }
@@ -371,8 +372,8 @@ namespace BOM.Models
                     
                 }
             }
-            sqlTransaction.Commit();
-            DBConnection.CloseConnection(sqlConnection);
+            transaction.Commit();
+            connection.Close();
         }
 
         public class RelationMaintain

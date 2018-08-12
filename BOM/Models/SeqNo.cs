@@ -1,5 +1,7 @@
 using System;
 using System.Data.SqlClient;
+using BOM.DbAccess;
+using System.Data.Common;
 
 namespace BOM.Models
 {
@@ -14,15 +16,21 @@ namespace BOM.Models
             int result = 0;
             string seqNo = null;
 
-            SqlConnection sqlConnection = DBConnection.OpenConnection();
-            SqlTransaction sqlTransaction = sqlConnection.BeginTransaction();
+            //SqlConnection sqlConnection = DBConnection.OpenConnection();
+            //SqlTransaction sqlTransaction = sqlConnection.BeginTransaction();
+
+            DbConnection connection = DbUtilities.GetConnection();
+            DbTransaction transaction = connection.BeginTransaction();
+
+
+
             string sql = @"SELECT * FROM SEQ_NO WHERE Ind_Key = '0'";
 
-            using (SqlCommand command = new SqlCommand(sql, sqlConnection))
+            using (DbCommand command = connection.CreateCommand())
             {
-
-                command.Transaction = sqlTransaction;
-                SqlDataReader dataReader = command.ExecuteReader();
+                command.CommandText = sql;
+                command.Transaction = transaction;
+                DbDataReader dataReader = command.ExecuteReader();
 
                 if (dataReader.HasRows)
                 {
@@ -40,7 +48,7 @@ namespace BOM.Models
                 else
                 {
                     dataReader.Close();
-                    DBConnection.CloseConnection(sqlConnection);
+                    connection.Close();
                     throw new Exception("There is no base parameter!");
                 }
 
@@ -50,21 +58,21 @@ namespace BOM.Models
                     result = command.ExecuteNonQuery();
                     if (result == 0)
                     {
-                        sqlTransaction.Rollback();
-                        DBConnection.CloseConnection(sqlConnection);
+                        transaction.Rollback();
+                        connection.Close();
                         throw new Exception("update table seq_no error!");
                     }                    
                 }
                 catch
                 {
-                    sqlTransaction.Rollback();
-                    DBConnection.CloseConnection(sqlConnection);
+                    transaction.Rollback();
+                    connection.Close();
                     throw;
                 }
-                sqlTransaction.Commit();
+                transaction.Commit();
             }
 
-            DBConnection.CloseConnection(sqlConnection);
+            connection.Close();
             return seqNo;
         }
 
@@ -73,13 +81,14 @@ namespace BOM.Models
             int result = 0;
             string seqNo = null;
 
-            SqlConnection sqlConnection = DBConnection.OpenConnection();
+            DbConnection connection = DbUtilities.GetConnection();
             string sql = $"SELECT * FROM SEQ_NO WHERE Ind_Key = '{tmpId}'";
-            SqlTransaction sqlTransaction = sqlConnection.BeginTransaction();
-            using (SqlCommand command = new SqlCommand(sql, sqlConnection))
+            DbTransaction transaction = connection.BeginTransaction();
+            using (DbCommand command = connection.CreateCommand())
             {
-                command.Transaction = sqlTransaction;
-                SqlDataReader dataReader = command.ExecuteReader();
+                command.CommandText = sql;
+                command.Transaction = transaction;
+                DbDataReader dataReader = command.ExecuteReader();
 
                 if (dataReader.HasRows)
                 {
@@ -98,22 +107,31 @@ namespace BOM.Models
                 {
                     log.Error(string.Format($"找不到物料参数记录,TmpID=[{tmpId}]"));
                     dataReader.Close();
-                    DBConnection.CloseConnection(sqlConnection);
+                    connection.Close();
                     throw new Exception(string.Format($"找不到物料参数记录,TmpID=[{tmpId}]"));
                 }
 
-                command.CommandText = sql;
-                result = command.ExecuteNonQuery();
-                if (result == 0)
+                try
                 {
-                    log.Error($"更新序号表出错,TmpID=[{tmpId}]");
-                    DBConnection.CloseConnection(sqlConnection);
-                    throw new Exception($"更新序号表出错,TmpID=[{tmpId}]");
+                    command.CommandText = sql;
+                    result = command.ExecuteNonQuery();
+                    if (result == 0)
+                    {
+                        log.Error($"更新序号表出错,TmpID=[{tmpId}]");
+                        transaction.Rollback();
+                        connection.Close();
+                        throw new Exception($"更新序号表出错,TmpID=[{tmpId}]");
+                    }
                 }
-
+                catch
+                {
+                    transaction.Rollback();
+                    connection.Close();
+                    throw;
+                }
+                transaction.Commit();
             }
-            sqlTransaction.Commit();
-            DBConnection.CloseConnection(sqlConnection);
+            connection.Close();
             return seqNo;
         }
     }

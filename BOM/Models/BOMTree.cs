@@ -4,32 +4,34 @@ using System.Data.SqlClient;
 using System.Linq;
 using System.Text;
 using System.Web;
+using System.Data.Common;
+using BOM.DbAccess;
 
 namespace BOM.Models
 {
     public class BOMTree
     {
         log4net.ILog log = log4net.LogManager.GetLogger("BOMTree");
-        SqlConnection connection = null;
-        SqlCommand command = null;
-        SqlTransaction transaction = null;
+        DbConnection connection = null;
+        DbCommand command = null;
+        DbTransaction transaction = null;
 
         public BOMTree()
         {
 
         }
-        public BOMTree(SqlConnection sqlConnection, SqlCommand sqlCommand, SqlTransaction sqlTransaction)
+        public BOMTree(DbConnection connection, DbCommand command, DbTransaction transaction)
         {
-            this.connection = sqlConnection;
-            this.command = sqlCommand;
-            this.transaction = sqlTransaction;
+            this.connection = connection;
+            this.command = command;
+            this.transaction = transaction;
         }
 
 
 
         //展开BOM数
         //根据上送父子模板编码，将子模板下的所有子孙模板信息，包括属性信息生成nodeinfo数组返回前台
-        public void FindChildrenTree(SqlConnection connection, ref List<NodeInfo> list, long pTmpid, int prlSeqNo, long tmpId, int rlSeqNo, int level)
+        public void FindChildrenTree(DbConnection connection, ref List<NodeInfo> list, long pTmpid, int prlSeqNo, long tmpId, int rlSeqNo, int level)
         {
             string sql = null;
             NodeInfo nodeInfo = new NodeInfo();
@@ -38,11 +40,10 @@ namespace BOM.Models
             List<long> listCTmpId = new List<long>();
             List<int> listSeqNo = new List<int>();
 
-            SqlDataReader dataReader = null;
+            DbDataReader dataReader = null;
 
-            using (SqlCommand command = new SqlCommand())
+            using (DbCommand command = connection.CreateCommand())
             {
-                command.Connection = connection;
 
                 //获取当前模板名称
                 sql = $"SELECT TmpNm FROM TmpInfo WHERE TmpId = {tmpId}";
@@ -161,14 +162,13 @@ namespace BOM.Models
 
             StringBuilder insertBuilder = new StringBuilder($"INSERT INTO [{nodeInfo.TmpId}] (");
             StringBuilder insertValues = new StringBuilder($" ) VALUES (");
-            SqlConnection sqlConnection = DBConnection.OpenConnection();
-            SqlTransaction sqlTransaction = sqlConnection.BeginTransaction();
-            SqlDataReader dataReader = null;
+            DbConnection connection = DbUtilities.GetConnection();
+            DbTransaction transaction = connection.BeginTransaction();
+            DbDataReader dataReader = null;
 
-            using (SqlCommand command = new SqlCommand())
+            using (DbCommand command = connection.CreateCommand())
             {
-                command.Connection = sqlConnection;
-                command.Transaction = sqlTransaction;
+                command.Transaction = transaction;
 
                 //当前节点是否有私有属性
                 hasPrivateAttribute = nodeInfo.Attributes.Where(m => m.Flag == "1").Count() > 0;
@@ -185,13 +185,13 @@ namespace BOM.Models
                     catch (Exception e)
                     {
                         log.Error(string.Format($"Look for talbe {nodeInfo.TmpId} Error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                        DBConnection.CloseConnection(sqlConnection);
+                        connection.Close();
                         throw;
                     }
                     if (result == 0)
                     {
                         log.Error(string.Format($"Table {nodeInfo.TmpId} doesn't exsit!\nsql[{sql}]\n"));
-                        DBConnection.CloseConnection(sqlConnection);
+                        connection.Close();
                         throw new Exception($"Table {nodeInfo.TmpId} doesn't exsit!!");
                     }
 
@@ -231,13 +231,13 @@ namespace BOM.Models
                     catch (Exception e)
                     {
                         log.Error(string.Format($"Select private attribute Error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                        DBConnection.CloseConnection(sqlConnection);
+                        connection.Close();
                         throw;
                     }
                     if (result > 0)
                     {
                         log.Error(string.Format($"The private attrbutes have already exsited!\nsql[{sql}]\n"));
-                        DBConnection.CloseConnection(sqlConnection);
+                        connection.Close();
                         throw new Exception("The private attrbutes have already exsited!!");
                     }
                 }
@@ -277,7 +277,7 @@ namespace BOM.Models
                     if (result == 0)
                     {
                         log.Error($"No record is updated,TmpID=[{nodeInfo.TmpId}]");
-                        DBConnection.CloseConnection(sqlConnection);
+                        connection.Close();
                         throw new Exception($"No record is updated,TmpID=[{nodeInfo.TmpId}]");
                     }
                 }
@@ -285,8 +285,8 @@ namespace BOM.Models
                 {
                     log.Error($"Get MaterielIdentification Error,TmpID=[{nodeInfo.TmpId}]sql=[{sql}]error[{e.StackTrace}][{e}][{e.Message}]");
                     dataReader.Close();
-                    sqlTransaction.Rollback();
-                    DBConnection.CloseConnection(sqlConnection);
+                    transaction.Rollback();
+                    connection.Close();
                     throw;
                 }
 
@@ -303,15 +303,15 @@ namespace BOM.Models
                     catch (Exception e)
                     {
                         log.Error(string.Format($"Register private attribute Error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                        sqlTransaction.Rollback();
-                        DBConnection.CloseConnection(sqlConnection);
+                        transaction.Rollback();
+                        connection.Close();
                         throw;
                     }
                     if (result == 0)
                     {
                         log.Error(string.Format($"No private attrbutes is registered!\nsql[{sql}]\n"));
-                        sqlTransaction.Rollback();
-                        DBConnection.CloseConnection(sqlConnection);
+                        transaction.Rollback();
+                        connection.Close();
                         throw new Exception("No private attrbutes is registered!");
                     }
                 }
@@ -344,22 +344,22 @@ namespace BOM.Models
                 catch (Exception e)
                 {
                     log.Error(string.Format($"Register default attribute Error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                    sqlTransaction.Rollback();
-                    DBConnection.CloseConnection(sqlConnection);
+                    transaction.Rollback();
+                    connection.Close();
                     throw;
                 }
                 if (result == 0)
                 {
                     log.Error(string.Format($"No default attrbutes is registered!\nsql[{sql}]\n"));
-                    sqlTransaction.Rollback();
-                    DBConnection.CloseConnection(sqlConnection);
+                    transaction.Rollback();
+                    connection.Close();
                     throw new Exception("No default attrbutes is registered!");
                 }
 
-                sqlTransaction.Commit();
+                transaction.Commit();
 
             }
-            DBConnection.CloseConnection(sqlConnection);
+            connection.Close();
             return materielIdentification;
         }
 
@@ -368,11 +368,10 @@ namespace BOM.Models
             int result = -1;
             string sql = null;
 
-            SqlConnection sqlConnection = DBConnection.OpenConnection();
+            DbConnection connection =DbUtilities.GetConnection();
 
-            using (SqlCommand command = new SqlCommand())
+            using (DbCommand command = connection.CreateCommand())
             {
-                command.Connection = sqlConnection;
                 sql = $"DELETE FROM BOM WHERE materielIdentfication = {pMaterielId} AND CmId = {materielId} and rlSeqNo = {rlSeqNo}";
                 command.CommandText = sql;
                 try
@@ -382,17 +381,17 @@ namespace BOM.Models
                 catch (Exception e)
                 {
                     log.Error(string.Format($"Delete from BOM Error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                    DBConnection.CloseConnection(sqlConnection);
+                    connection.Close();
                     throw;
                 }
                 if (result == 0)
                 {
                     log.Error(string.Format($"No record is deleted!\nsql[{sql}]\n"));
-                    DBConnection.CloseConnection(sqlConnection);
+                    connection.Close();
                     throw new Exception("No record is deleted!");
                 }
             }
-            DBConnection.CloseConnection(sqlConnection);
+            connection.Close();
 
         }
 
@@ -409,7 +408,7 @@ namespace BOM.Models
             List<long> listCtmpId = new List<long>();
             List<int> listSeqNo = new List<int>();
 
-            SqlDataReader reader = null;
+            DbDataReader reader = null;
 
             //如果没有上送物料编码
             if (node.MaterielId == 0L)
@@ -617,7 +616,7 @@ namespace BOM.Models
                 values.Clear();
                 relationList.Clear();
 
-                SqlDataReader reader = command.ExecuteReader();
+                DbDataReader reader = command.ExecuteReader();
                 if (reader.HasRows)
                 {
                     //将子节点当前属性的关系定义读取到列表中
@@ -1187,7 +1186,7 @@ namespace BOM.Models
             StringBuilder insertBuilder = new StringBuilder($"INSERT INTO [{node.TmpId}] (");
             StringBuilder insertValues = new StringBuilder($" ) VALUES (");
 
-            SqlDataReader dataReader = null;
+            DbDataReader dataReader = null;
 
             //如果节点没有物料编码则生成
             if (node.MaterielId == 0)

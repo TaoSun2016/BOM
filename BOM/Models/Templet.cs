@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Data.SqlClient;
 using System.Text;
+using BOM.DbAccess;
+using System.Data.Common;
 
 namespace BOM.Models
 {
@@ -9,62 +11,17 @@ namespace BOM.Models
     {
         log4net.ILog log = log4net.LogManager.GetLogger("Templet");
 
-        //public string GetTmpId(SqlConnection connection,SqlCommand command)
-        //{
-        //    int result = 0;
-        //    long tempSeqNo = 0;
-        //    string seqNo = null;
-        //    string sql = @"SELECT * FROM SEQ_NO WHERE Ind_Key = '0'";
-        //    SqlDataReader dataReader = command.ExecuteReader();
-
-        //    if (dataReader.HasRows)
-        //    {
-        //        dataReader.Read();
-
-        //        tempSeqNo = (long)dataReader["NEXT_NO"];
-
-        //        dataReader.Close();
-
-        //        seqNo = Convert.ToString(tempSeqNo, 8) + "9";
-        //        tempSeqNo += 1;
-        //        sql = $"UPDATE SEQ_NO SET NEXT_NO = {tempSeqNo} WHERE IND_KEY = '0'";
-        //    }
-        //    else
-        //    {
-        //        log.Error(string.Format($"Select Seq_No error\nsql[{sql}]\n"));
-        //        dataReader.Close();
-        //        throw new Exception("There is no base parameter!");
-        //    }
-
-        //    try
-        //    {
-        //        command.CommandText = sql;
-        //        result = command.ExecuteNonQuery();
-        //        if (result == 0)
-        //        {
-        //            log.Error(string.Format($"Update Seq_No 0 record\nsql[{sql}]\n"));
-        //            throw new Exception("update table seq_no error!");
-        //        }
-        //    }
-        //    catch (Exception e)
-        //    {
-        //        log.Error(string.Format($"Update Seq_No error\nsql[{sql}][{e.StackTrace}]\n"));
-        //        throw;
-        //    }
-        //    return seqNo;
-        //}
         //新建根物料模板
         public void CreateTemplet(string templetName, string creater)
         {
             int result = 0;
             string sql = null;
 
-            SqlConnection sqlConnection = DBConnection.OpenConnection();
-            SqlTransaction sqlTransaction = sqlConnection.BeginTransaction();
-            using (SqlCommand command = new SqlCommand())
+            DbConnection connection = DbUtilities.GetConnection();
+            DbTransaction transaction = connection.BeginTransaction();
+            using (DbCommand command =connection.CreateCommand())
             {
-                command.Connection = sqlConnection;
-                command.Transaction = sqlTransaction;
+                command.Transaction = transaction;
 
                 //检查模板名称是否重复
                 sql = $"SELECT COUNT(*) FROM TmpInfo WHERE TmpNm = '{templetName}' ";
@@ -76,14 +33,14 @@ namespace BOM.Models
                 catch (Exception e)
                 {
                     log.Error(string.Format($"Select from table TmpInfo error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                    DBConnection.CloseConnection(sqlConnection);
+                    connection.Close();
                     throw;
                 }
 
                 if (result > 0)
                 {
                     log.Error(string.Format($"模板名称重复!Name=[{templetName}]\nsql[{sql}]\n"));
-                    DBConnection.CloseConnection(sqlConnection);
+                    connection.Close();
                     throw new Exception("模板名称重复!");
                 }
 
@@ -100,16 +57,16 @@ namespace BOM.Models
                 catch (Exception e)
                 {
                     log.Error(string.Format($"Insert table TmpInfo error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                    sqlTransaction.Rollback();
-                    DBConnection.CloseConnection(sqlConnection);
+                    transaction.Rollback();
+                    connection.Close();
                     throw;
                 }
 
                 if (result == 0)
                 {
                     log.Error(string.Format($"插入TmpInfo记录数为0\nsql[{sql}]\n"));
-                    sqlTransaction.Rollback();
-                    DBConnection.CloseConnection(sqlConnection);
+                    transaction.Rollback();
+                    connection.Close();
                     throw new Exception("插入TmpInfo记录数为0!");
                 }
 
@@ -123,21 +80,21 @@ namespace BOM.Models
                 catch (Exception e)
                 {
                     log.Error(string.Format($"Insert table Relation error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                    sqlTransaction.Rollback();
-                    DBConnection.CloseConnection(sqlConnection);
+                    transaction.Rollback();
+                    connection.Close();
                     throw;
                 }
 
                 if (result == 0)
                 {
                     log.Error(string.Format($"Insert table Relation 0 record!\nsql[{sql}]\n"));
-                    sqlTransaction.Rollback();
-                    DBConnection.CloseConnection(sqlConnection);
+                    transaction.Rollback();
+                    connection.Close();
                     throw new Exception("Insert table Relation 0 record!");
                 }
             }
-            sqlTransaction.Commit();
-            DBConnection.CloseConnection(sqlConnection);
+            transaction.Commit();
+            connection.Close();
         }
 
         //新建物料信息(非根物料节点,无参考模板,上送父模板ID和新模板名称)
@@ -147,12 +104,11 @@ namespace BOM.Models
             int rlSeqNo = -1;
             string sql = null;
 
-            SqlConnection sqlConnection = DBConnection.OpenConnection();
-            SqlTransaction sqlTransaction = sqlConnection.BeginTransaction();
-            using (SqlCommand command = new SqlCommand())
+            DbConnection connection = DbUtilities.GetConnection();
+            DbTransaction transaction = connection.BeginTransaction();
+            using (DbCommand command = connection.CreateCommand())
             {
-                command.Connection = sqlConnection;
-                command.Transaction = sqlTransaction;
+                command.Transaction = transaction;
 
                 //检查有无重复模板名称
                 sql = $"SELECT COUNT(*) FROM TmpInfo WHERE TmpNm = '{templetName}' ";
@@ -164,14 +120,14 @@ namespace BOM.Models
                 catch (Exception e)
                 {
                     log.Error(string.Format($"Select from table TmpInfo error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                    DBConnection.CloseConnection(sqlConnection);
+                    connection.Close();
                     throw;
                 }
 
                 if (result > 0)
                 {
                     log.Error(string.Format($"模板名称重复!Name=[{templetName}]\nsql[{sql}]\n"));
-                    DBConnection.CloseConnection(sqlConnection);
+                    connection.Close();
                     throw new Exception("模板名称重复!");
                 }
 
@@ -185,14 +141,14 @@ namespace BOM.Models
                 catch (Exception e)
                 {
                     log.Error(string.Format($"Select from table TmpInfo error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                    DBConnection.CloseConnection(sqlConnection);
+                    connection.Close();
                     throw;
                 }
 
                 if (result != 1)
                 {
                     log.Error(string.Format($"父模板不存在!TmpId=[{parentTempletId}]\nsql[{sql}]\n"));
-                    DBConnection.CloseConnection(sqlConnection);
+                    connection.Close();
                     throw new Exception("父模板不存在!");
                 }
 
@@ -208,16 +164,16 @@ namespace BOM.Models
                 catch (Exception e)
                 {
                     log.Error(string.Format($"Insert table TmpInfo error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                    sqlTransaction.Rollback();
-                    DBConnection.CloseConnection(sqlConnection);
+                    transaction.Rollback();
+                    connection.Close();
                     throw;
                 }
 
                 if (result == 0)
                 {
                     log.Error(string.Format($"插入TmpInfo记录数为0\nsql[{sql}]\n"));
-                    sqlTransaction.Rollback();
-                    DBConnection.CloseConnection(sqlConnection);
+                    transaction.Rollback();
+                    connection.Close();
                     throw new Exception("插入TmpInfo记录数为0!");
                 }
 
@@ -233,7 +189,7 @@ namespace BOM.Models
                 catch (Exception e)
                 {
                     log.Error(string.Format($"Select Table Relation error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                    DBConnection.CloseConnection(sqlConnection);
+                    connection.Close();
                     throw;
                 }
                 rlSeqNo++;
@@ -248,15 +204,15 @@ namespace BOM.Models
                 catch (Exception e)
                 {
                     log.Error(string.Format($"Insert table Relation error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                    sqlTransaction.Rollback();
-                    DBConnection.CloseConnection(sqlConnection);
+                    transaction.Rollback();
+                    connection.Close();
                     throw;
                 }
                 if (result == 0)
                 {
                     log.Error(string.Format($"插入Relation表记录数为0\nsql[{sql}]\n"));
-                    sqlTransaction.Rollback();
-                    DBConnection.CloseConnection(sqlConnection);
+                    transaction.Rollback();
+                    connection.Close();
                     throw new Exception("插入Relation表记录数为0!");
                 }
 
@@ -272,21 +228,21 @@ namespace BOM.Models
                 catch (Exception e)
                 {
                     log.Error(string.Format($"Insert table AttrPass error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                    sqlTransaction.Rollback();
-                    DBConnection.CloseConnection(sqlConnection);
+                    transaction.Rollback();
+                    connection.Close();
                     throw;
                 }
                 if (result == 0)
                 {
                     log.Error(string.Format($"Insert table Attrpass 0 record\nsql[{sql}]\n"));
-                    sqlTransaction.Rollback();
-                    DBConnection.CloseConnection(sqlConnection);
+                    transaction.Rollback();
+                    connection.Close();
                     throw new Exception("Insert table Attrpass 0 record!");
                 }
-                sqlTransaction.Commit();
+                transaction.Commit();
 
             }
-            DBConnection.CloseConnection(sqlConnection);
+            connection.Close();
         }
 
         //新建物料信息(非根物料节点,有参考模板,父模板)
@@ -296,12 +252,11 @@ namespace BOM.Models
             int rlSeqNo = -1;
             string sql = null;
 
-            SqlConnection sqlConnection = DBConnection.OpenConnection();
-            SqlTransaction sqlTransaction = sqlConnection.BeginTransaction();
-            using (SqlCommand command = new SqlCommand())
+            DbConnection connection = DbUtilities.GetConnection();
+            DbTransaction transaction = connection.BeginTransaction();
+            using (DbCommand command = connection.CreateCommand())
             {
-                command.Connection = sqlConnection;
-                command.Transaction = sqlTransaction;
+                command.Transaction = transaction;
 
                
                 //登记数据库表Relation
@@ -316,8 +271,8 @@ namespace BOM.Models
                 catch (Exception e)
                 {
                     log.Error(string.Format($"Select Table Relation error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                    sqlTransaction.Rollback();
-                    DBConnection.CloseConnection(sqlConnection);
+                    transaction.Rollback();
+                    connection.Close();
                     throw;
                 }
                 rlSeqNo++;
@@ -332,15 +287,15 @@ namespace BOM.Models
                 catch (Exception e)
                 {
                     log.Error(string.Format($"Insert table Relation error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                    sqlTransaction.Rollback();
-                    DBConnection.CloseConnection(sqlConnection);
+                    transaction.Rollback();
+                    connection.Close();
                     throw;
                 }
                 if (result == 0)
                 {
                     log.Error(string.Format($"插入Relation表记录数为0\nsql[{sql}]\n"));
-                    sqlTransaction.Rollback();
-                    DBConnection.CloseConnection(sqlConnection);
+                    transaction.Rollback();
+                    connection.Close();
                     throw new Exception("插入Relation表记录数为0!");
                 }
 
@@ -355,21 +310,21 @@ namespace BOM.Models
                 catch (Exception e)
                 {
                     log.Error(string.Format($"Insert table AttrPass error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                    sqlTransaction.Rollback();
-                    DBConnection.CloseConnection(sqlConnection);
+                    transaction.Rollback();
+                    connection.Close();
                     throw;
                 }
                 if (result == 0)
                 {
                     log.Error(string.Format($"Insert table Attrpass 0 record\nsql[{sql}]\n"));
-                    sqlTransaction.Rollback();
-                    DBConnection.CloseConnection(sqlConnection);
+                    transaction.Rollback();
+                    connection.Close();
                     throw new Exception("Insert table Attrpass 0 record!");
                 }
-                sqlTransaction.Commit();
+                transaction.Commit();
 
             }
-            DBConnection.CloseConnection(sqlConnection);
+            connection.Close();
         }
 
         //删除模板节点
@@ -378,12 +333,11 @@ namespace BOM.Models
             int result = 0;
             string sql = null;
 
-            SqlConnection sqlConnection = DBConnection.OpenConnection();
-            SqlTransaction sqlTransaction = sqlConnection.BeginTransaction();
-            using (SqlCommand command = new SqlCommand())
+            DbConnection connection = DbUtilities.GetConnection();
+            DbTransaction transaction = connection.BeginTransaction();
+            using (DbCommand command = connection.CreateCommand())
             {
-                command.Connection = sqlConnection;
-                command.Transaction = sqlTransaction;
+                command.Transaction = transaction;
 
                 //Delete AttrPass
                 sql = $"DELETE FROM  AttrPass  where TmpId = '{parentTempletId}' and CTmpId = '{TempletId}' and rlseqno = {rlSeqNo}";
@@ -395,15 +349,15 @@ namespace BOM.Models
                 catch (Exception e)
                 {
                     log.Error(string.Format($"Delete AttrPass error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                    sqlTransaction.Rollback();
-                    DBConnection.CloseConnection(sqlConnection);
+                    transaction.Rollback();
+                    connection.Close();
                     throw;
                 }
                 if (result == 0)
                 {
                     log.Error(string.Format($"Delete Attrpass 0 record\nsql[{sql}]\n"));
-                    sqlTransaction.Rollback();
-                    DBConnection.CloseConnection(sqlConnection);
+                    transaction.Rollback();
+                    connection.Close();
                     throw new Exception("Delete Attrpass 0 record!");
                 }
 
@@ -417,20 +371,20 @@ namespace BOM.Models
                 catch (Exception e)
                 {
                     log.Error(string.Format($"Delete Relation error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                    sqlTransaction.Rollback();
-                    DBConnection.CloseConnection(sqlConnection);
+                    transaction.Rollback();
+                    connection.Close();
                     throw;
                 }
                 if (result == 0)
                 {
                     log.Error(string.Format($"Delete Relation 0 record\nsql[{sql}]\n"));
-                    sqlTransaction.Rollback();
-                    DBConnection.CloseConnection(sqlConnection);
+                    transaction.Rollback();
+                    connection.Close();
                     throw new Exception("Delete Relation 0 record!");
                 }
-                sqlTransaction.Commit();
+                transaction.Commit();
             }
-            DBConnection.CloseConnection(sqlConnection);
+            connection.Close();
         }
 
         //锁定模板
@@ -444,12 +398,11 @@ namespace BOM.Models
             string sql = null;
             StringBuilder sqlCreate = new StringBuilder();
 
-            SqlConnection sqlConnection = DBConnection.OpenConnection();
-            SqlTransaction sqlTransaction = sqlConnection.BeginTransaction();
-            using (SqlCommand command = new SqlCommand())
+            DbConnection connection = DbUtilities.GetConnection();
+            DbTransaction transaction = connection.BeginTransaction();
+            using (DbCommand command = connection.CreateCommand())
             {
-                command.Connection = sqlConnection;
-                command.Transaction = sqlTransaction;
+                command.Transaction = transaction;
 
                 try
                 {
@@ -476,15 +429,15 @@ namespace BOM.Models
                 catch (Exception e)
                 {
                     log.Error(string.Format($"Lock templet error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                    sqlTransaction.Rollback();
-                    DBConnection.CloseConnection(sqlConnection);
+                    transaction.Rollback();
+                    connection.Close();
                     throw;
                 }
                 if ( result4 == 0)//其它result可能存在等于0的情况,不作例外处理
                 {
                     log.Error(string.Format($"Lock templet error!\nsql[{sql}]\n"));
-                    sqlTransaction.Rollback();
-                    DBConnection.CloseConnection(sqlConnection);
+                    transaction.Rollback();
+                    connection.Close();
                     throw new Exception("Lock templet error!!");
                 }
 
@@ -492,7 +445,7 @@ namespace BOM.Models
                 sqlCreate.Append($"CREATE TABLE [{templetId}] (materielIdentfication bigint PRIMARY KEY CLUSTERED");
                 command.CommandText = sql;
 
-                using (SqlDataReader sqlDataReader = command.ExecuteReader())
+                using (DbDataReader sqlDataReader = command.ExecuteReader())
                 {
                     if (sqlDataReader.HasRows)
                     {
@@ -512,22 +465,22 @@ namespace BOM.Models
                         catch (Exception e)
                         {
                             log.Error(string.Format($"Create table error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                            sqlTransaction.Rollback();
-                            DBConnection.CloseConnection(sqlConnection);
+                            transaction.Rollback();
+                            connection.Close();
                             throw;
                         }
                         if (result1 == 0)
                         {
                             log.Error(string.Format($"Create table error!!\nsql[{sql}]\n"));
-                            sqlTransaction.Rollback();
-                            DBConnection.CloseConnection(sqlConnection);
+                            transaction.Rollback();
+                            connection.Close();
                             throw new Exception("Lock templet error!!");
                         }
                     }
                 }
-                sqlTransaction.Commit();
+                transaction.Commit();
             }
-            DBConnection.CloseConnection(sqlConnection);
+            connection.Close();
         }
     }
 }

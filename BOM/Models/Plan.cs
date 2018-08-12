@@ -4,15 +4,17 @@ using System.Data.SqlClient;
 using System.Linq;
 using System.Text;
 using System.Web;
+using System.Data.Common;
+using BOM.DbAccess;
 
 namespace BOM.Models
 {
     public class Plan : IDisposable
     {
         log4net.ILog log = log4net.LogManager.GetLogger("Plan");
-        private SqlConnection connection = null;
-        private SqlCommand cmd = new SqlCommand();
-        private SqlTransaction transaction = null;
+        private DbConnection connection = null;
+        private DbCommand cmd = new SqlCommand();
+        private DbTransaction transaction = null;
 
         private int option;
 
@@ -21,7 +23,7 @@ namespace BOM.Models
         string sql = null;
         List<Stock> stocks = new List<Stock>();
         List<Bom> bomTree = new List<Bom>();
-        public Plan(int option, SqlConnection conn, SqlCommand sqlCommand, SqlTransaction sqlTransaction)
+        public Plan(int option, DbConnection conn, DbCommand sqlCommand, DbTransaction sqlTransaction)
         {
             this.option = option;
             connection = conn;
@@ -91,7 +93,8 @@ namespace BOM.Models
             }
 
             //更新上期库存量，重排，续排才处理
-            if (option == 1 || option == 2) { 
+            if (option == 1 || option == 2)
+            {
                 if (!UpdatePAB())
                 {
                     log.Error(string.Format($"Update PAB Failed!\n"));
@@ -109,119 +112,117 @@ namespace BOM.Models
 
         private bool InitData()
         {
-            SqlDataReader dataReader = null;
+            DbDataReader dataReader = null;
             stocks.Clear();
             string tmp = "";
 
             //获取DeafaultAttr表中当前所有物料的参数
-            using (SqlCommand cmd1 = new SqlCommand())
+            sql = $"select * from DeafaultAttr";
+            cmd.CommandText = sql;
+            try
             {
-                sql = $"select * from DeafaultAttr";
+                dataReader = cmd.ExecuteReader();
+                if (dataReader.HasRows)
+                {
+                    while (dataReader.Read())
+                    {
+                        var item = new Stock();
+                        item.flag = 0;
+
+                        //物料编码
+                        tmp = dataReader["materielIdentfication"].ToString();
+                        item.wuLBM = Convert.ToInt64(tmp);
+
+                        //在途数量
+                        tmp = dataReader["SR"].ToString();
+                        item.SOR = Convert.ToDecimal(tmp == string.Empty ? "0.00" : tmp);
+
+                        //上期库存数量
+                        if (option == 2 || option == 4)//续排，预续排
+                        {
+                            if (tableFlag == 0)//本次从_STORE_获取值，计算后的新值登记到_STORE_1中
+                            {
+                                tmp = dataReader["_STORE_"].ToString();
+                                item.PAB = Convert.ToDecimal(tmp == string.Empty ? "0.00" : tmp);
+                            }
+                            else
+                            {//本次从_STORE_1获取值，计算后的新值登记到_STORE_中
+                                tmp = dataReader["_STORE_1"].ToString();
+                                item.PAB = Convert.ToDecimal(tmp == string.Empty ? "0.00" : tmp);
+                            }
+                        }
+
+                        //安全库存
+                        tmp = dataReader["SS"].ToString();
+                        item.SS = Convert.ToDecimal(tmp == string.Empty ? "0.00" : tmp);
+
+                        //批量规则
+                        tmp = dataReader["LS"].ToString();
+                        item.LS = Convert.ToDecimal(tmp == string.Empty ? "0.00" : tmp);
+
+                        //生产形式
+                        item.shengChXSh = dataReader["SHENGCLX"].ToString();
+
+                        //投料标识
+                        tmp = dataReader["touLBSh"].ToString();
+                        item.touLBSh = Convert.ToInt64(tmp == string.Empty ? "0" : tmp);
+
+                        //工序号
+                        item.zum = dataReader["zum"].ToString();
+
+                        //图号
+                        item.tuhao = dataReader["tuhao"].ToString();
+
+                        //规格
+                        item.guige = dataReader["guige"].ToString();
+
+                        //在库数量OH初始化
+                        item.OH = 0.00m;
+
+                        stocks.Add(item);
+                    }
+                }
+                else
+                {
+                    log.Error(string.Format($"表DeafaultAttr中没有记录r!\nsql[{sql}]\nError"));
+                    return false;
+                }
+            }
+            catch (Exception e)
+            {
+                log.Error(string.Format($"Select DeafaultAttr error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                return false;
+            }
+            finally
+            {
+                dataReader.Close();
+            }
+
+            //获取每个物料的库存数量
+            foreach (var item in stocks)
+            {
+                sql = $"select isnull(sum(kuCSh),0.0000) from kuCShJB001 where wuLBM = {item.wuLBM}";
                 cmd.CommandText = sql;
+                cmd.Connection = connection;
                 try
                 {
-                    dataReader = cmd.ExecuteReader();
-                    if (dataReader.HasRows)
-                    {
-                        while (dataReader.Read())
-                        {
-                            var item = new Stock();
-                            item.flag = 0;
-
-                            //物料编码
-                            tmp = dataReader["materielIdentfication"].ToString();
-                            item.wuLBM = Convert.ToInt64(tmp);   
-
-                            //在途数量
-                            tmp = dataReader["SR"].ToString();
-                            item.SOR = Convert.ToDecimal(tmp == string.Empty?"0.00":tmp);          
-
-                            //上期库存数量
-                            if (option == 2 || option == 4)//续排，预续排
-                            {
-                                if (tableFlag == 0)//本次从_STORE_获取值，计算后的新值登记到_STORE_1中
-                                {
-                                    tmp = dataReader["_STORE_"].ToString();
-                                    item.PAB = Convert.ToDecimal(tmp == string.Empty ? "0.00" : tmp); 
-                                }
-                                else {//本次从_STORE_1获取值，计算后的新值登记到_STORE_中
-                                    tmp = dataReader["_STORE_1"].ToString();
-                                    item.PAB = Convert.ToDecimal(tmp == string.Empty ? "0.00" : tmp);
-                                }
-                            }
-
-                            //安全库存
-                            tmp = dataReader["SS"].ToString();
-                            item.SS = Convert.ToDecimal(tmp == string.Empty ? "0.00": tmp);
-
-                            //批量规则
-                            tmp = dataReader["LS"].ToString();
-                            item.LS = Convert.ToDecimal(tmp == string.Empty ? "0.00" : tmp);
-
-                            //生产形式
-                            item.shengChXSh = dataReader["SHENGCLX"].ToString();
-
-                            //投料标识
-                            tmp = dataReader["touLBSh"].ToString();
-                            item.touLBSh = Convert.ToInt64(tmp == string.Empty?"0": tmp);
-
-                            //工序号
-                            item.zum = dataReader["zum"].ToString();
-
-                            //图号
-                            item.tuhao = dataReader["tuhao"].ToString();
-
-                            //规格
-                            item.guige = dataReader["guige"].ToString();
-
-                            //在库数量OH初始化
-                            item.OH = 0.00m;
-
-                            stocks.Add(item);
-                        }
-                    }
-                    else
-                    {
-                        log.Error(string.Format($"表DeafaultAttr中没有记录r!\nsql[{sql}]\nError"));
-                        return false;
-                    }
+                    tmp = cmd.ExecuteScalar().ToString();
+                    item.OH = Convert.ToDecimal(tmp == string.Empty ? "0.00" : tmp);
                 }
                 catch (Exception e)
                 {
-                    log.Error(string.Format($"Select DeafaultAttr error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                    log.Error(string.Format($"获取在库数量OH Error!\nsql[{sql}]\nError[{e.StackTrace}]\nMessage[{e.Message}]"));
                     return false;
                 }
-                finally
+
+                if (option == 1 || option == 3)//重排，预重排
                 {
-                    dataReader.Close();
+                    //重排：上期库存=在途+在库
+                    item.PAB = item.SOR + item.OH;
                 }
-
-                //获取每个物料的库存数量
-                foreach (var item in stocks)
-                {
-                    sql = $"select isnull(sum(kuCSh),0.0000) from kuCShJB001 where wuLBM = {item.wuLBM}";
-                    cmd.CommandText = sql;
-                    cmd.Connection = connection;
-                    try
-                    {
-                        tmp = cmd.ExecuteScalar().ToString();
-                        item.OH = Convert.ToDecimal(tmp == string.Empty ? "0.00" : tmp);
-                    }
-                    catch (Exception e)
-                    {
-                        log.Error(string.Format($"获取在库数量OH Error!\nsql[{sql}]\nError[{e.StackTrace}]\nMessage[{e.Message}]"));
-                        return false;
-                    }
-
-                    if (option == 1 || option == 3)//重排，预重排
-                    {
-                        //重排：上期库存=在途+在库
-                        item.PAB = item.SOR + item.OH;
-                    }
-                }
-
-                return true;
             }
+
+            return true;
         }
 
         //给全局变量tableFlag赋值：
@@ -287,7 +288,7 @@ namespace BOM.Models
         {
             long tmpWuLBM = 0L;
             Bom bom = new Bom();
-            SqlDataReader reader = null;
+            DbDataReader reader = null;
 
 
             //查找代用件
@@ -399,11 +400,11 @@ namespace BOM.Models
         }
         private bool HandlePlanFlag(PlanItem item)
         {
-            if (option == 1 || option == 3 )//重排，预重排
+            if (option == 1 || option == 3)//重排，预重排
             {
-                sql = $"delete from switch where gongZLH='{item.gongZLH}' and qiH='{item.qiH}' and xuH={item.xuH} " +
-                      $"insert into switch (gongZLH, qiH, xuH, ciSh) values ('{item.gongZLH}', '{item.qiH}', {item.xuH}, 0)";
-                
+                sql = $"delete from switch where gongZLH='{item.gongZLH}' and qiH='{item.qiH}' and xuH={item.xuH}; " +
+                      $"insert into switch (gongZLH, qiH, xuH, ciSh) values ('{item.gongZLH}', '{item.qiH}', {item.xuH}, 0);";
+
             }
             else
             {
@@ -414,7 +415,7 @@ namespace BOM.Models
             {
                 cmd.ExecuteNonQuery();
             }
-            catch 
+            catch
             {
                 log.Error(string.Format($"update switch Error!\nsql[{sql}]\n"));
                 return false;
@@ -444,12 +445,12 @@ namespace BOM.Models
                 iterator++;
 
                 var fieldName = "_STORE_";
-                if ((option == 2 || option == 4)&&tableFlag == 0)//续排且tableFlag为0，则登记—_STORE_1字段
+                if ((option == 2 || option == 4) && tableFlag == 0)//续排且tableFlag为0，则登记—_STORE_1字段
                 {
                     fieldName = "_STORE_1";
                 }
-               
-                sb.Append($"UPDATE DeafaultAttr SET [{fieldName}] = {item.PAB} WHERE materielIdentfication = {item.wuLBM} ");
+
+                sb.Append($"UPDATE DeafaultAttr SET [{fieldName}] = {item.PAB} WHERE materielIdentfication = {item.wuLBM}; ");
 
                 if (iterator % 1000 == 0)
                 {
@@ -603,9 +604,9 @@ namespace BOM.Models
                         break;
                 }
 
-                    
-                sql = $"delete from [{tableName}] where gongZLH='{item.gongZLH}' and qiH='{item.qiH}' and wuLBM={stock.wuLBM} " +
-                      $"insert into [{tableName}] (gongZLH, qiH, xuH, wuLBM, gongZLBSh, mingCh, guiG, tuH, shengChXSh, gongShSh, queJShL, jiHBB, chunJHQJ ) values ('{item.gongZLH}', '{item.qiH}', 0, {stock.wuLBM},'','','','',{stock.shengChXSh},0.00,{PORC},'',0.00)";
+
+                sql = $"delete from [{tableName}] where gongZLH='{item.gongZLH}' and qiH='{item.qiH}' and wuLBM={stock.wuLBM}; " +
+                      $"insert into [{tableName}] (gongZLH, qiH, xuH, wuLBM, gongZLBSh, mingCh, guiG, tuH, shengChXSh, gongShSh, queJShL, jiHBB, chunJHQJ ) values ('{item.gongZLH}', '{item.qiH}', 0, {stock.wuLBM},'','','','',{stock.shengChXSh},0.00,{PORC},'',0.00);";
 
 
                 cmd.CommandText = sql;
@@ -620,7 +621,7 @@ namespace BOM.Models
                 }
 
                 //预排不再进行后续处理
-                if (option == 3 || option  == 4)
+                if (option == 3 || option == 4)
                 {
                     return true;
                 }
@@ -671,12 +672,13 @@ namespace BOM.Models
                         try
                         {
                             var result = (int)cmd.ExecuteScalar();
-                            if (result == 1)//找到记录，更新原记录
+                            sql = "";  
+                            if (result == 1)//找到记录，更新原记录   ???不等于1如何处理
                             {
                                 if (option == 1 || option == 3)//重排，预重排 覆盖原记录计划数量的值
                                 {
                                     //根据令号，期号和物料编码删除原记录
-                                    sql = $"delete from gongXZhYZhBDZhB where gongZLH = '{item.gongZLH}' and qiH = '{item.qiH}' and wuLBM = {stock.wuLBM} ";
+                                    sql = $"delete from gongXZhYZhBDZhB where gongZLH = '{item.gongZLH}' and qiH = '{item.qiH}' and wuLBM = {stock.wuLBM}; ";
                                 }
                                 else//续排 报错
                                 {
@@ -693,7 +695,7 @@ namespace BOM.Models
                                 chanPMCh = stock.wuLBM.ToString().Substring(0, pos);
                             }
 
-                            sql = sql + $"insert into gongXZhYZhBDZhB (wuLBM,chanPMCh,gongXBSh) values ({stock.wuLBM},'{chanPMCh}',{stock.zum})";
+                            sql = sql + $"insert into gongXZhYZhBDZhB (wuLBM,chanPMCh,gongXBSh) values ({stock.wuLBM},'{chanPMCh}',{stock.zum});";
 
                             cmd.CommandText = sql;
                             result = cmd.ExecuteNonQuery();
@@ -715,12 +717,13 @@ namespace BOM.Models
                         try
                         {
                             var result = (int)cmd.ExecuteScalar();
+                            sql = "";
                             if (result == 1)//找到记录，更新原记录
                             {
                                 if (option == 1 || option == 3)//重排，预重排 覆盖原记录计划数量的值
                                 {
                                     //
-                                    sql = $"delete from gongXZhYZhBDCB where gongZLH = '{item.gongZLH}' and qiH = '{item.qiH}' and xuH = {item.xuH} and wuLBM = {stock.wuLBM} ";
+                                    sql = $"delete from gongXZhYZhBDCB where gongZLH = '{item.gongZLH}' and qiH = '{item.qiH}' and xuH = {item.xuH} and wuLBM = {stock.wuLBM}; ";
                                 }
                                 else//续排 报错
                                 {
@@ -729,7 +732,7 @@ namespace BOM.Models
                                 }
                             }
 
-                            sql = sql + $"insert into gongXZhYZhBDCB (gongZLH, qiH, xuH, wuLBM, jiHShL,tuH, guiG ) values ('{item.gongZLH}','{item.qiH}',{item.xuH},{stock.wuLBM},{PORC},'{stock.tuhao}','{stock.guige}')";
+                            sql = sql + $"insert into gongXZhYZhBDCB (gongZLH, qiH, xuH, wuLBM, jiHShL,tuH, guiG ) values ('{item.gongZLH}','{item.qiH}',{item.xuH},{stock.wuLBM},{PORC},'{stock.tuhao}','{stock.guige}');";
 
                             cmd.CommandText = sql;
                             result = cmd.ExecuteNonQuery();
@@ -789,12 +792,13 @@ namespace BOM.Models
                         try
                         {
                             var result = (int)cmd.ExecuteScalar();
+                            sql = "";
                             if (result == 1)//找到记录，更新原记录
                             {
                                 if (option == 1 || option == 3)//重排，预重排 覆盖原记录计划数量的值
                                 {
                                     //
-                                    sql = $"delete from waiXChKZhBDZB where gongZLH = '{item.gongZLH}' and qiH = '{item.qiH}' and xuH = {item.xuH} and wuLBM = {stock.wuLBM} ";
+                                    sql = $"delete from waiXChKZhBDZB where gongZLH = '{item.gongZLH}' and qiH = '{item.qiH}' and xuH = {item.xuH} and wuLBM = {stock.wuLBM}; ";
                                 }
                                 else//续排 报错
                                 {
@@ -804,7 +808,7 @@ namespace BOM.Models
 
                             }
 
-                            sql = sql + $"insert into waiXChKZhBDZB (gongZLH, qiH, xuH, wuLBM, tuH, guiG ) values ('{item.gongZLH}','{item.qiH}',{item.xuH},{stock.wuLBM},'{stock.tuhao}','{stock.guige}')";
+                            sql = sql + $"insert into waiXChKZhBDZB (gongZLH, qiH, xuH, wuLBM, tuH, guiG ) values ('{item.gongZLH}','{item.qiH}',{item.xuH},{stock.wuLBM},'{stock.tuhao}','{stock.guige}');";
 
                             cmd.CommandText = sql;
                             result = cmd.ExecuteNonQuery();
@@ -826,12 +830,13 @@ namespace BOM.Models
                         try
                         {
                             var result = (int)cmd.ExecuteScalar();
+                            sql = "";
                             if (result == 1)//找到记录，更新原记录
                             {
                                 if (option == 1 || option == 3)//重排，预重排 覆盖原记录计划数量的值
                                 {
                                     //
-                                    sql = $"delete from waiXChKZhBDCB where gongZLH = '{item.gongZLH}' and qiH = '{item.qiH}' and xuH = {item.xuH} and wuLBM = {stock.wuLBM} ";
+                                    sql = $"delete from waiXChKZhBDCB where gongZLH = '{item.gongZLH}' and qiH = '{item.qiH}' and xuH = {item.xuH} and wuLBM = {stock.wuLBM}; ";
                                 }
                                 else//续排 报错
                                 {
@@ -864,12 +869,13 @@ namespace BOM.Models
                         try
                         {
                             var result = (int)cmd.ExecuteScalar();
+                            sql = "";
                             if (result == 1)//找到记录，更新原记录
                             {
                                 if (option == 1 || option == 3)//重排，预重排 覆盖原记录计划数量的值
                                 {
                                     //?? 给哪些字段赋值
-                                    sql = $"delete from gongXZhYZhBDZhB where gongZLH = '{item.gongZLH}' and qiH = '{item.qiH}' and wuLBM = {stock.wuLBM} ";
+                                    sql = $"delete from gongXZhYZhBDZhB where gongZLH = '{item.gongZLH}' and qiH = '{item.qiH}' and wuLBM = {stock.wuLBM}; ";
                                 }
                                 else//续排 报错??应该是查到续排前有重复的领号，期号，序号的记录就报错
                                 {
@@ -887,7 +893,7 @@ namespace BOM.Models
                                 chanPMCh = stock.wuLBM.ToString().Substring(0, pos);
                             }
 
-                            sql = sql + $"insert into gongXZhYZhBDZhB (wuLBM,chanPMCh,gongXBSh) values ({stock.wuLBM},'{chanPMCh}',{stock.zum})";
+                            sql = sql + $"insert into gongXZhYZhBDZhB (wuLBM,chanPMCh,gongXBSh) values ({stock.wuLBM},'{chanPMCh}',{stock.zum});";
 
                             cmd.CommandText = sql;
                             result = cmd.ExecuteNonQuery();
@@ -909,12 +915,13 @@ namespace BOM.Models
                         try
                         {
                             var result = (int)cmd.ExecuteScalar();
+                            sql = "";
                             if (result == 1)//找到记录，更新原记录
                             {
                                 if (option == 1 || option == 3)//重排，预重排 覆盖原记录计划数量的值
                                 {
                                     //
-                                    sql = $"delete from gongXZhYZhBDCB where gongZLH = '{item.gongZLH}' and qiH = '{item.qiH}' and xuH = {item.xuH} and wuLBM = {stock.wuLBM} ";
+                                    sql = $"delete from gongXZhYZhBDCB where gongZLH = '{item.gongZLH}' and qiH = '{item.qiH}' and xuH = {item.xuH} and wuLBM = {stock.wuLBM}; ";
                                 }
                                 else//续排 报错
                                 {

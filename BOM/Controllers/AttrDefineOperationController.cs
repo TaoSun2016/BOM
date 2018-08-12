@@ -13,50 +13,6 @@ namespace BOM.Controllers
     public class AttrDefineOperationController : ApiController
     {
         log4net.ILog log = log4net.LogManager.GetLogger("Attribute");
-        AttrDefineOperation operation = new AttrDefineOperation();
-
-        /* 只用一个批量接口
-        [HttpGet]
-        [Route("GetAll")]
-        public List<AttrDefine> Get()
-        {
-            log.Debug(string.Format("time is {0}",DateTime.Now));
-            return operation.Query();
-        }
-
-
-        [HttpGet]
-        [Route("GetOne")]
-        public AttrDefine GetOne(long tmpId, string attrId, string attrNm, string attrTp)
-        {
-            return operation.QueryOne( tmpId,  attrId,  attrNm,  attrTp);
-        }
-
-        [HttpPost]
-        [Route("Create")]
-        public void Post(AttrDefine attrDefine)
-        {
-            if (ModelState.IsValid)
-            {
-                operation.Insert(attrDefine);
-            }
-            
-        }
-
-        [HttpPut]
-        [Route("Update")]
-        public void Put(long oldTmpId, string oldAttrId, string oldAttrNm, string oldAttrTp, AttrDefine attrDefine)
-        {
-            operation.Update(oldTmpId,  oldAttrId, oldAttrNm, oldAttrTp, attrDefine.TmpId,attrDefine.AttrId,attrDefine.AttrNm,attrDefine.AttrTp,attrDefine.LstUpdter);
-        }
-
-        [HttpDelete]
-        [Route("Delete")]
-        public void Delete(long tmpId, string attrId, string attrNm, string attrTp)
-        {
-            operation.Delete(tmpId, attrId, attrNm, attrTp);
-        }
-        */
 
         [HttpPost]
         [Route("Batch")]

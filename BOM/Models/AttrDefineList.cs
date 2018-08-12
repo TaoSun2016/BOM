@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Data.SqlClient;
+using System.Data.Common;
+using BOM.DbAccess;
 
 namespace BOM.Models
 {
@@ -12,12 +14,11 @@ namespace BOM.Models
             string sql = null;
             log4net.ILog log = log4net.LogManager.GetLogger("attributeList");
 
-            SqlConnection sqlConnection = DBConnection.OpenConnection();
-            SqlTransaction sqlTransaction = sqlConnection.BeginTransaction();
-            using (SqlCommand command = new SqlCommand())
+            DbConnection connection = DbUtilities.GetConnection();
+            DbTransaction transaction = connection.BeginTransaction();
+            using (DbCommand command = connection.CreateCommand())
             {
-                command.Connection = sqlConnection;
-                command.Transaction = sqlTransaction;
+                command.Transaction = transaction;
 
 
                 foreach (AttrDefine attribute in list)
@@ -31,15 +32,15 @@ namespace BOM.Models
                     catch (Exception e)
                     {
                         log.Error(string.Format($"Update attrdefine error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                        sqlTransaction.Rollback();
-                        DBConnection.CloseConnection(sqlConnection);
+                        transaction.Rollback();
+                        connection.Close();
                         throw;
                     }
                     if (result == 0)
                     {
                         log.Error(string.Format($"无此模板号!TmpId={attribute.TmpId}\n sql[{sql}]\n"));
-                        sqlTransaction.Rollback();
-                        DBConnection.CloseConnection(sqlConnection);
+                        transaction.Rollback();
+                        connection.Close();
                         throw new Exception($"无此模板[{attribute.TmpId}]!");
                     }
 
@@ -63,8 +64,8 @@ namespace BOM.Models
                             break;
                         default:
                             log.Error(string.Format($"数据操作选项错误!\nOption[{attribute.Option}]"));
-                            sqlTransaction.Rollback();
-                            DBConnection.CloseConnection(sqlConnection);
+                            transaction.Rollback();
+                            connection.Close();
                             throw new Exception("数据操作选项错误!");
                     }
                     command.CommandText = sql;
@@ -75,8 +76,8 @@ namespace BOM.Models
                     catch (Exception e)
                     {
                         log.Error(string.Format($"Update attrdefine error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                        sqlTransaction.Rollback();
-                        DBConnection.CloseConnection(sqlConnection);
+                        transaction.Rollback();
+                        connection.Close();
                         throw;
                     }
 
@@ -84,14 +85,14 @@ namespace BOM.Models
                     if (result == 0)
                     {
                         log.Error(string.Format($"无记录受影响!\nsql[{sql}]\n"));
-                        sqlTransaction.Rollback();
-                        DBConnection.CloseConnection(sqlConnection);
+                        transaction.Rollback();
+                        connection.Close();
                         throw new Exception("无记录受影响!");
                     }
                 }
-                sqlTransaction.Commit();
+                transaction.Commit();
             }
-            DBConnection.CloseConnection(sqlConnection);
+            connection.Close();
         }
     }
 }

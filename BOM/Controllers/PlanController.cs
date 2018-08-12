@@ -6,6 +6,8 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Web.Http;
+using System.Data.Common;
+using BOM.DbAccess;
 
 namespace BOM.Controllers
 {
@@ -20,20 +22,18 @@ namespace BOM.Controllers
         public void CreatePlan(PlanRequest request)
         {
             //PlanRequest request = new PlanRequest();
-            SqlConnection sqlConnection = DBConnection.OpenConnection();
-            SqlCommand command = new SqlCommand();
-
-            SqlTransaction transaction = sqlConnection.BeginTransaction();
-            command.Connection = sqlConnection;
+            DbConnection connection = DbUtilities.GetConnection();
+            DbCommand command = connection.CreateCommand();
+            DbTransaction transaction = connection.BeginTransaction();
             command.Transaction = transaction;
 
-            Plan plan = new Plan(request.option, sqlConnection, command, transaction);
+            Plan plan = new Plan(request.option, connection, command, transaction);
 
             if (!plan.CreatePlan(request.requestItems))
             {
                 transaction.Rollback();
                 command.Dispose();
-                DBConnection.CloseConnection(sqlConnection);
+                connection.Close();
 
                 string logMessage = string.Format($"Create Plan error!\n");
                 log.Error(logMessage);
@@ -46,7 +46,7 @@ namespace BOM.Controllers
             }
             transaction.Commit();
             command.Dispose();
-            DBConnection.CloseConnection(sqlConnection);
+            connection.Close();
         }
     }
     public class PlanRequest

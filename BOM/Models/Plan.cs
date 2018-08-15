@@ -6,6 +6,7 @@ using System.Text;
 using System.Web;
 using System.Data.Common;
 using BOM.DbAccess;
+using System.Configuration;
 
 namespace BOM.Models
 {
@@ -17,6 +18,8 @@ namespace BOM.Models
         private DbTransaction transaction = null;
 
         private int option;
+
+        string dbType = ConfigurationManager.AppSettings["DbType"];
 
         //tableFlag=0时，续排登记缺件表1，PAB登记daefault._store_1,否则登记缺件表，PAB登记daefault._store_
         private int tableFlag = 0;
@@ -201,7 +204,7 @@ namespace BOM.Models
             //获取每个物料的库存数量
             foreach (var item in stocks)
             {
-                sql = $"select isnull(sum(kuCSh),0.0000) from kuCShJB001 where wuLBM = {item.wuLBM}";
+                sql = ("MySQL" == dbType)? $"select ifnull(sum(kuCSh),0.0000) from kuCShJB001 where wuLBM = {item.wuLBM}" : $"select isnull(sum(kuCSh),0.0000) from kuCShJB001 where wuLBM = {item.wuLBM}";
                 cmd.CommandText = sql;
                 cmd.Connection = connection;
                 try
@@ -408,7 +411,7 @@ namespace BOM.Models
             }
             else
             {
-                sql = $"update switch set ciSh = ciSh + 1 where gongZLH='{item.gongZLH}' and qiH='{item.qiH}' and xuH={item.xuH}";
+                sql = $"update switch set ciSh = ciSh + 1 where gongZLH='{item.gongZLH}' and qiH='{item.qiH}' and xuH={item.xuH};";
             }
             cmd.CommandText = sql;
             try
@@ -605,8 +608,8 @@ namespace BOM.Models
                 }
 
 
-                sql = $"delete from [{tableName}] where gongZLH='{item.gongZLH}' and qiH='{item.qiH}' and wuLBM={stock.wuLBM}; " +
-                      $"insert into [{tableName}] (gongZLH, qiH, xuH, wuLBM, gongZLBSh, mingCh, guiG, tuH, shengChXSh, gongShSh, queJShL, jiHBB, chunJHQJ ) values ('{item.gongZLH}', '{item.qiH}', 0, {stock.wuLBM},'','','','',{stock.shengChXSh},0.00,{PORC},'',0.00);";
+                sql = $"delete from {tableName} where gongZLH='{item.gongZLH}' and qiH='{item.qiH}' and wuLBM={stock.wuLBM}; " +
+                      $"insert into {tableName} (gongZLH, qiH, xuH, wuLBM, gongZLBSh, mingCh, guiG, tuH, shengChXSh, gongShSh, queJShL, jiHBB, chunJHQJ ) values ('{item.gongZLH}', '{item.qiH}', 0, {stock.wuLBM},'','','','',{stock.shengChXSh},0.00,{PORC},'',0.00);";
 
 
                 cmd.CommandText = sql;
@@ -634,7 +637,7 @@ namespace BOM.Models
                         cmd.CommandText = sql;
                         try
                         {
-                            var result = (int)cmd.ExecuteScalar();
+                            var result = Convert.ToInt32(cmd.ExecuteScalar());
                             if (result == 1)//找到记录，更新原记录
                             {
                                 if (option == 1 || option == 3)//重排，预重排 覆盖原记录计划数量的值
@@ -671,7 +674,7 @@ namespace BOM.Models
                         cmd.CommandText = sql;
                         try
                         {
-                            var result = (int)cmd.ExecuteScalar();
+                            var result = Convert.ToInt32(cmd.ExecuteScalar());
                             sql = "";  
                             if (result == 1)//找到记录，更新原记录   ???不等于1如何处理
                             {
@@ -716,7 +719,7 @@ namespace BOM.Models
                         cmd.CommandText = sql;
                         try
                         {
-                            var result = (int)cmd.ExecuteScalar();
+                            var result = Convert.ToInt32(cmd.ExecuteScalar());
                             sql = "";
                             if (result == 1)//找到记录，更新原记录
                             {
@@ -753,7 +756,7 @@ namespace BOM.Models
                         cmd.CommandText = sql;
                         try
                         {
-                            var result = (int)cmd.ExecuteScalar();
+                            var result = Convert.ToInt32(cmd.ExecuteScalar());
                             if (result == 1)//找到记录，更新原记录
                             {
                                 if (option == 1 || option == 3)//重排，预重排 覆盖原记录计划数量的值
@@ -791,7 +794,7 @@ namespace BOM.Models
                         cmd.CommandText = sql;
                         try
                         {
-                            var result = (int)cmd.ExecuteScalar();
+                            var result = Convert.ToInt32(cmd.ExecuteScalar());
                             sql = "";
                             if (result == 1)//找到记录，更新原记录
                             {
@@ -829,7 +832,7 @@ namespace BOM.Models
                         cmd.CommandText = sql;
                         try
                         {
-                            var result = (int)cmd.ExecuteScalar();
+                            var result = Convert.ToInt32(cmd.ExecuteScalar());
                             sql = "";
                             if (result == 1)//找到记录，更新原记录
                             {
@@ -868,7 +871,7 @@ namespace BOM.Models
                         cmd.CommandText = sql;
                         try
                         {
-                            var result = (int)cmd.ExecuteScalar();
+                            var result = Convert.ToInt32(cmd.ExecuteScalar());
                             sql = "";
                             if (result == 1)//找到记录，更新原记录
                             {
@@ -914,7 +917,7 @@ namespace BOM.Models
                         cmd.CommandText = sql;
                         try
                         {
-                            var result = (int)cmd.ExecuteScalar();
+                            var result = Convert.ToInt32(cmd.ExecuteScalar());
                             sql = "";
                             if (result == 1)//找到记录，更新原记录
                             {

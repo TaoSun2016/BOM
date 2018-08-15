@@ -6,7 +6,7 @@ using System.Text;
 using System.Web;
 using System.Data.Common;
 using BOM.DbAccess;
-
+using System.Configuration;
 namespace BOM.Models
 {
     public class BOMTree
@@ -15,6 +15,7 @@ namespace BOM.Models
         DbConnection connection = null;
         DbCommand command = null;
         DbTransaction transaction = null;
+        string dbType = ConfigurationManager.AppSettings["DbType"];
 
         public BOMTree()
         {
@@ -159,8 +160,18 @@ namespace BOM.Models
             bool hasPrivateAttribute = false;
             string materielIdentification = null;
             string sql = null;
+            StringBuilder insertBuilder = null;
 
-            StringBuilder insertBuilder = new StringBuilder($"INSERT INTO [{nodeInfo.TmpId}] (");
+            if ("MySQL" == dbType)
+            {
+                insertBuilder = new StringBuilder($"INSERT INTO `{nodeInfo.TmpId}` (");
+
+            }
+            else
+            {
+                insertBuilder = new StringBuilder($"INSERT INTO [{nodeInfo.TmpId}] (");
+
+            }
             StringBuilder insertValues = new StringBuilder($" ) VALUES (");
             DbConnection connection = DbUtilities.GetConnection();
             DbTransaction transaction = connection.BeginTransaction();
@@ -176,11 +187,19 @@ namespace BOM.Models
                 if (hasPrivateAttribute)
                 {
                     //检查该模板的私有属性表是否存在，表名和模板号相同
-                    sql = $"SELECT COUNT(*) FROM SYSOBJECTS WHERE NAME = '{nodeInfo.TmpId}' AND TYPE = 'U'";
+                    if ("MySQL" == dbType)
+                    {
+                        sql = $"SELECT COUNT(*) FROM information_schema.TABLES WHERE table_name = '{nodeInfo.TmpId}'";
+                    }
+                    else
+                    {
+                        sql = $"SELECT COUNT(*) FROM SYSOBJECTS WHERE NAME = '{nodeInfo.TmpId}' AND TYPE = 'U'";
+
+                    }
                     command.CommandText = sql;
                     try
                     {
-                        result = (int)command.ExecuteScalar();
+                        result = Convert.ToInt32(command.ExecuteScalar());
                     }
                     catch (Exception e)
                     {
@@ -196,7 +215,16 @@ namespace BOM.Models
                     }
 
                     //检查当前私有属性的值是否已存在，存在则报错
-                    StringBuilder builder = new StringBuilder($"SELECT COUNT(*) FROM [{nodeInfo.TmpId}] WHERE");
+                    StringBuilder builder;
+                    if ("MySQL" == dbType)
+                    {
+                        builder = new StringBuilder($"SELECT COUNT(*) FROM `{nodeInfo.TmpId}` WHERE");
+                    }
+                    else
+                    {
+                        builder = new StringBuilder($"SELECT COUNT(*) FROM [{nodeInfo.TmpId}] WHERE");
+                    }
+                   
 
                     int counter = 0;
                     var privateAttributes = nodeInfo.Attributes.Where(m => m.Flag == "1");
@@ -205,14 +233,14 @@ namespace BOM.Models
                         counter++;
                         if (attrbute.Type == "C")
                         {
-                            builder.Append($" [{attrbute.Id}] = '{attrbute.Values[0]}'");
-                            insertBuilder.Append($" [{attrbute.Id}],");
+                            builder.Append(("MySQL" == dbType) ? $" `{attrbute.Id}` = '{attrbute.Values[0]}'" : $" [{attrbute.Id}] = '{attrbute.Values[0]}'");
+                            insertBuilder.Append(("MySQL" == dbType) ? $" `{attrbute.Id}`," : $" [{attrbute.Id}],");
                             insertValues.Append($" '{attrbute.Values[0]}',");
                         }
                         else
                         {
-                            builder.Append($" [{attrbute.Id}] = {attrbute.Values[0]}");
-                            insertBuilder.Append($" [{attrbute.Id}],");
+                            builder.Append(("MySQL" == dbType) ? $" `{attrbute.Id}` = {attrbute.Values[0]}" : $" [{attrbute.Id}] = {attrbute.Values[0]}");
+                            insertBuilder.Append(("MySQL" == dbType) ? $" `{attrbute.Id}`," : $" [{attrbute.Id}],");
                             insertValues.Append($" {attrbute.Values[0]},");
                         }
 
@@ -226,7 +254,7 @@ namespace BOM.Models
                     command.CommandText = sql;
                     try
                     {
-                        result = (int)command.ExecuteScalar();
+                        result = Convert.ToInt32(command.ExecuteScalar());
                     }
                     catch (Exception e)
                     {
@@ -324,7 +352,7 @@ namespace BOM.Models
                 var defaultAttributes = nodeInfo.Attributes.Where(m => m.Flag == "0");
                 foreach (var defaultAttrbute in defaultAttributes)
                 {
-                    insertBuilder.Append($" [{defaultAttrbute.Id}],");
+                    insertBuilder.Append(("MySQL"==dbType)? $" `{defaultAttrbute.Id}`," : $" [{defaultAttrbute.Id}],");
                     if (defaultAttrbute.Type == "C")
                     {
                         insertValues.Append($" '{defaultAttrbute.Values[0]}',");
@@ -429,11 +457,11 @@ namespace BOM.Models
                 {
                     List<long> materielIdList = new List<long>();
                     stringBuilder.Clear();
-                    stringBuilder.Append($"SELECT ISNULL(materielIdentfication,0)  AS ID FROM [{node.TmpId}] WHERE 1 = 1");
+                    stringBuilder.Append(("MySQL"==dbType)? $"SELECT IFNULL(materielIdentfication,0)  AS ID FROM [{node.TmpId}] WHERE 1 = 1" : $"SELECT ISNULL(materielIdentfication,0)  AS ID FROM [{node.TmpId}] WHERE 1 = 1");
                     foreach (var attribute in node.Attributes.Where(m => m.Flag == "1"))
                     {
                         var value = (attribute.Type == "C") ? ("'" + attribute.Values[0].Trim() + "'") : attribute.Values[0].Trim();
-                        stringBuilder.Append($" AND [{attribute.Id}] = {value}");
+                        stringBuilder.Append(("MySQL" == dbType) ? $" AND `{attribute.Id}` = {value}" : $" AND [{attribute.Id}] = {value}");
                     }
                     sql = stringBuilder.ToString();
                     command.CommandText = sql;
@@ -1105,11 +1133,18 @@ namespace BOM.Models
                 if (hasPrivateAttribute)
                 {
                     //检查私有属性表是否存在，不存在则报错
-                    sql = $"SELECT COUNT(*) FROM SYSOBJECTS WHERE NAME = '{root_node.TmpId}' ";
+                    if ("MySQL" == dbType)
+                    {
+                        sql = $"SELECT COUNT(*) FROM information_schema.TABLES WHERE table_name = '{root_node.TmpId}' ";
+                    }
+                    else
+                    {
+                        sql = $"SELECT COUNT(*) FROM SYSOBJECTS WHERE NAME = '{root_node.TmpId}' AND TYPE='U' ";
+                    }
                     command.CommandText = sql;
                     try
                     {
-                        result = (int)command.ExecuteScalar();
+                        result = Convert.ToInt32(command.ExecuteScalar());
                     }
                     catch (Exception e)
                     {
@@ -1156,7 +1191,7 @@ namespace BOM.Models
             command.CommandText = sql;
             try
             {
-                result = (int)command.ExecuteScalar();
+                result = Convert.ToInt32(command.ExecuteScalar());
             }
             catch (Exception e)
             {
@@ -1183,7 +1218,7 @@ namespace BOM.Models
             bool hasPrivateAttribute = false;
             string materielIdentification = null;
             string sql = null;
-            StringBuilder insertBuilder = new StringBuilder($"INSERT INTO [{node.TmpId}] (");
+            StringBuilder insertBuilder = new StringBuilder(("MySQL"==dbType)? $"INSERT INTO `{node.TmpId}` (" : $"INSERT INTO [{node.TmpId}] (");
             StringBuilder insertValues = new StringBuilder($" ) VALUES (");
 
             DbDataReader dataReader = null;
@@ -1196,11 +1231,18 @@ namespace BOM.Models
                 if (hasPrivateAttribute)
                 {
                     //检查私有属性表是否存在，不存在则报错
-                    sql = $"SELECT COUNT(*) FROM SYSOBJECTS WHERE NAME = '{node.TmpId}' ";
+                    if ("MySQL" == dbType)
+                    {
+                        sql = $"SELECT COUNT(*) FROM information_schema.TABLES WHERE table_name = '{node.TmpId}' ";
+                    }
+                    else
+                    {
+                        sql = $"SELECT COUNT(*) FROM SYSOBJECTS WHERE NAME = '{node.TmpId}' AND TYPE='U' ";
+                    }
                     command.CommandText = sql;
                     try
                     {
-                        result = (int)command.ExecuteScalar();
+                        result = Convert.ToInt32(command.ExecuteScalar());
                     }
                     catch (Exception e)
                     {
@@ -1215,8 +1257,8 @@ namespace BOM.Models
 
                     //如果有私有属性表，则登记当前私有属性到表中
                     //根据私有属性查询私有属性表的SQL语句
-                    StringBuilder builder = new StringBuilder($"SELECT COUNT(*) FROM [{node.TmpId}] WHERE");
-                    StringBuilder mIdBuilder = new StringBuilder($"SELECT materielIdentfication FROM [{node.TmpId}] WHERE");
+                    StringBuilder builder = new StringBuilder(("MySQL" == dbType)? $"SELECT COUNT(*) FROM `{node.TmpId}` WHERE" : $"SELECT COUNT(*) FROM [{node.TmpId}] WHERE");
+                    StringBuilder mIdBuilder = new StringBuilder(("MySQL" == dbType) ? $"SELECT materielIdentfication FROM `{node.TmpId}` WHERE" : $"SELECT materielIdentfication FROM [{node.TmpId}] WHERE");
 
                     int counter = 0;
                     var privateAttributes = node.Attributes.Where(m => m.Flag == "1");
@@ -1225,16 +1267,16 @@ namespace BOM.Models
                         counter++;
                         if (attrbute.Type == "C")
                         {
-                            builder.Append($" [{attrbute.Id}] = '{attrbute.Values[0]}'");
-                            mIdBuilder.Append($" [{attrbute.Id}] = '{attrbute.Values[0]}'");
-                            insertBuilder.Append($" [{attrbute.Id}],");
+                            builder.Append(("MySQL" == dbType) ? $" `{attrbute.Id}` = '{attrbute.Values[0]}'" : $" [{attrbute.Id}] = '{attrbute.Values[0]}'");
+                            mIdBuilder.Append(("MySQL" == dbType) ? $" `{attrbute.Id}` = '{attrbute.Values[0]}'" : $" [{attrbute.Id}] = '{attrbute.Values[0]}'");
+                            insertBuilder.Append(("MySQL" == dbType) ? $" `{attrbute.Id}`," : $" [{attrbute.Id}],");
                             insertValues.Append($" '{attrbute.Values[0]}',");
                         }
                         else
                         {
-                            builder.Append($" [{attrbute.Id}] = {attrbute.Values[0]}");
-                            mIdBuilder.Append($" [{attrbute.Id}] = {attrbute.Values[0]}");
-                            insertBuilder.Append($" [{attrbute.Id}],");
+                            builder.Append(("MySQL" == dbType) ? $" `{attrbute.Id}` = {attrbute.Values[0]}" : $" [{attrbute.Id}] = {attrbute.Values[0]}");
+                            mIdBuilder.Append(("MySQL" == dbType) ? $" `{attrbute.Id}` = {attrbute.Values[0]}" : $" [{attrbute.Id}] = {attrbute.Values[0]}");
+                            insertBuilder.Append(("MySQL" == dbType) ? $" `{attrbute.Id}`," : $" [{attrbute.Id}],");
                             insertValues.Append($" {attrbute.Values[0]},");
                         }
 
@@ -1248,7 +1290,7 @@ namespace BOM.Models
                     command.CommandText = sql;
                     try
                     {
-                        result = (int)command.ExecuteScalar();
+                        result = Convert.ToInt32(command.ExecuteScalar());
                     }
                     catch (Exception e)
                     {
@@ -1332,7 +1374,7 @@ namespace BOM.Models
                         var defaultAttributes = node.Attributes.Where(m => m.Flag == "0");
                         foreach (var defaultAttrbute in defaultAttributes)
                         {
-                            insertBuilder.Append($" [{defaultAttrbute.Id}],");
+                            insertBuilder.Append(("MySQL"==dbType)? $" `{defaultAttrbute.Id}`," : $" [{defaultAttrbute.Id}],");
                             if (defaultAttrbute.Type == "C")
                             {
                                 insertValues.Append($" '{defaultAttrbute.Values[0]}',");

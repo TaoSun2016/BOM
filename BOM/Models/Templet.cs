@@ -4,12 +4,14 @@ using System.Data.SqlClient;
 using System.Text;
 using BOM.DbAccess;
 using System.Data.Common;
+using System.Configuration;
 
 namespace BOM.Models
 {
     public partial class Templet
     {
         log4net.ILog log = log4net.LogManager.GetLogger("Templet");
+        string dbType = ConfigurationManager.AppSettings["DbType"]; 
 
         //新建根物料模板
         public void CreateTemplet(string templetName, string creater)
@@ -28,7 +30,7 @@ namespace BOM.Models
                 command.CommandText = sql;
                 try
                 {
-                    result = (int)command.ExecuteScalar();
+                    result = Convert.ToInt32(command.ExecuteScalar());
                 }
                 catch (Exception e)
                 {
@@ -115,7 +117,7 @@ namespace BOM.Models
                 command.CommandText = sql;
                 try
                 {
-                    result = (int)command.ExecuteScalar();
+                    result = Convert.ToInt32( command.ExecuteScalar());
                 }
                 catch (Exception e)
                 {
@@ -136,7 +138,7 @@ namespace BOM.Models
                 command.CommandText = sql;
                 try
                 {
-                    result = (int)command.ExecuteScalar();
+                    result = Convert.ToInt32(command.ExecuteScalar());
                 }
                 catch (Exception e)
                 {
@@ -180,11 +182,20 @@ namespace BOM.Models
 
                 //登记父子模板关系表Relation
                 //获取Relation.rlSeqNo的值
-                sql = $"SELECT ISNULL(MAX(rlSeqNo),-1) FROM RELATION WHERE TmpId = '{parentTempletId}' and CTmpId = '{tmpId}'";
+                if ("MySQL" == dbType)
+                {
+                    sql = $"SELECT IFNULL(MAX(rlSeqNo),-1) FROM RELATION WHERE TmpId = '{parentTempletId}' and CTmpId = '{tmpId}'";
+
+                }
+                else
+                {
+                    sql = $"SELECT ISNULL(MAX(rlSeqNo),-1) FROM RELATION WHERE TmpId = '{parentTempletId}' and CTmpId = '{tmpId}'";
+
+                }
                 command.CommandText = sql;
                 try
                 {
-                    rlSeqNo = (int)command.ExecuteScalar();
+                    rlSeqNo = Convert.ToInt32(command.ExecuteScalar());
                 }
                 catch (Exception e)
                 {
@@ -258,15 +269,24 @@ namespace BOM.Models
             {
                 command.Transaction = transaction;
 
-               
+
                 //登记数据库表Relation
 
                 //获取Relation.rlSeqNo的值
-                sql = $"SELECT ISNULL(MAX(rlSeqNo),-1) FROM RELATION WHERE TmpId = '{parentTempletId}' and CTmpId = '{referenceTempletId}'";
+                if ("MySQL" == dbType)
+                {
+                    sql = $"SELECT IFNULL(MAX(rlSeqNo),-1) FROM RELATION WHERE TmpId = '{parentTempletId}' and CTmpId = '{referenceTempletId}'";
+
+                }
+                else
+                {
+                    sql = $"SELECT ISNULL(MAX(rlSeqNo),-1) FROM RELATION WHERE TmpId = '{parentTempletId}' and CTmpId = '{referenceTempletId}'";
+
+                }
                 command.CommandText = sql;
                 try
                 {
-                    rlSeqNo = (int)command.ExecuteScalar();
+                    rlSeqNo = Convert.ToInt32(command.ExecuteScalar());
                 }
                 catch (Exception e)
                 {
@@ -406,7 +426,7 @@ namespace BOM.Models
 
                 try
                 {
-                    sql = $"UPDATE TmpInfo SET LockCount = LockCount+1 WHERE TmpId = '{templetId}'";
+                    sql = $"UPDATE TmpInfo SET LockCount = LockCount+1 WHERE TmpId = {templetId}";
                     command.CommandText = sql;
                     result1 = command.ExecuteNonQuery();
                     if (result1 == 0)//无此模板
@@ -414,11 +434,11 @@ namespace BOM.Models
                         log.Error(string.Format($"无此模板!\nsql[{sql}]\n"));
                         throw new Exception("Lock templet error!!无此模板");
                     }
-                    sql = $"UPDATE Relation SET LockFlag = 1 WHERE LockFlag = 0 AND CTmpId = '{templetId}'";
+                    sql = $"UPDATE Relation SET LockFlag = 1 WHERE LockFlag = 0 AND CTmpId = {templetId}";
                     command.CommandText = sql;
                     result2 = command.ExecuteNonQuery();
 
-                    sql = $"UPDATE AttrDefine SET LockFlag = 1 WHERE LockFlag = 0 AND TmpId = '{templetId}'";
+                    sql = $"UPDATE AttrDefine SET LockFlag = 1 WHERE LockFlag = 0 AND TmpId = {templetId}";
                     command.CommandText = sql;
                     result3 = command.ExecuteNonQuery();
 
@@ -441,8 +461,17 @@ namespace BOM.Models
                     throw new Exception("Lock templet error!!");
                 }
 
-                sql = $"SELECT AttrId,AttrTp FROM AttrDefine WHERE TmpId = '{templetId}'";
-                sqlCreate.Append($"CREATE TABLE [{templetId}] (materielIdentfication bigint PRIMARY KEY CLUSTERED");
+                sql = $"SELECT AttrId,AttrTp FROM AttrDefine WHERE TmpId = {templetId}";
+                if ("MySQL" == dbType)
+                {
+                    sqlCreate.Append($"CREATE TABLE `{templetId}` (materielIdentfication bigint PRIMARY KEY");
+
+                }
+                else
+                {
+                    sqlCreate.Append($"CREATE TABLE [{templetId}] (materielIdentfication bigint PRIMARY KEY CLUSTERED");
+
+                }
                 command.CommandText = sql;
 
                 using (DbDataReader sqlDataReader = command.ExecuteReader())
@@ -451,11 +480,27 @@ namespace BOM.Models
                     {
                         while (sqlDataReader.Read())
                         {
-                            sqlCreate.Append(",[").Append(sqlDataReader["AttrId"].ToString().Trim())
-                          .Append((sqlDataReader["AttrTp"].ToString().Trim() == "C") ? "] varchar (50) COLLATE Chinese_PRC_CI_AS" : "] decimal(18,4)");
+                            if ("MySQL" == dbType)
+                            {
+                                sqlCreate.Append(",`").Append(sqlDataReader["AttrId"].ToString().Trim()).Append((sqlDataReader["AttrTp"].ToString().Trim() == "C") ? "` varchar (50)" : "` decimal(18,4)");
+                            }
+                            else
+                            {
+                                sqlCreate.Append(",[").Append(sqlDataReader["AttrId"].ToString().Trim()).Append((sqlDataReader["AttrTp"].ToString().Trim() == "C") ? "] varchar (50) COLLATE Chinese_PRC_CI_AS" : "] decimal(18,4)");
+                            }
+
                         }
                         sqlDataReader.Close();
-                        sqlCreate.Append(") ON [PRIMARY]");
+                        if ("MySQL" == dbType)
+                        {
+                            sqlCreate.Append(");");
+
+                        }
+                        else
+                        {
+                            sqlCreate.Append(") ON [PRIMARY]");
+
+                        }
                         sql = sqlCreate.ToString();
                         command.CommandText = sql;
                         try
@@ -468,13 +513,6 @@ namespace BOM.Models
                             transaction.Rollback();
                             connection.Close();
                             throw;
-                        }
-                        if (result1 == 0)
-                        {
-                            log.Error(string.Format($"Create table error!!\nsql[{sql}]\n"));
-                            transaction.Rollback();
-                            connection.Close();
-                            throw new Exception("Lock templet error!!");
                         }
                     }
                 }

@@ -23,15 +23,15 @@ namespace BOM.Models
 
                 foreach (AttrDefine attribute in list)
                 {
-                    sql = $"SELECT COUNT(*) FROM¡¡£ÔmpInfo WHERE TmpId = '{attribute.TmpId}'";
+                    sql = $"SELECT COUNT(*) FROM tmpinfo WHERE tmpid = {attribute.TmpId}";
                     command.CommandText = sql;
                     try
                     {
-                        result = (int)command.ExecuteScalar();
+                        result = Convert.ToInt32(command.ExecuteScalar());
                     }
                     catch (Exception e)
                     {
-                        log.Error(string.Format($"Update attrdefine error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                        log.Error(string.Format($"Update attrdefine error!\nsql[{sql}]\nError[{e.Message}]"));
                         transaction.Rollback();
                         connection.Close();
                         throw;

@@ -453,7 +453,8 @@ namespace BOM.Models
                     fieldName = "_STORE_1";
                 }
 
-                sb.Append($"UPDATE DeafaultAttr SET [{fieldName}] = {item.PAB} WHERE materielIdentfication = {item.wuLBM}; ");
+                sb.Append(("MySQL"==dbType)? $"UPDATE DeafaultAttr SET `{fieldName}` = {item.PAB} WHERE materielIdentfication = {item.wuLBM}; "
+                                            :$"UPDATE DeafaultAttr SET [{fieldName}] = {item.PAB} WHERE materielIdentfication = {item.wuLBM}; ");
 
                 if (iterator % 1000 == 0)
                 {

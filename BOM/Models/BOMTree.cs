@@ -457,7 +457,7 @@ namespace BOM.Models
                 {
                     List<long> materielIdList = new List<long>();
                     stringBuilder.Clear();
-                    stringBuilder.Append(("MySQL"==dbType)? $"SELECT IFNULL(materielIdentfication,0)  AS ID FROM [{node.TmpId}] WHERE 1 = 1" : $"SELECT ISNULL(materielIdentfication,0)  AS ID FROM [{node.TmpId}] WHERE 1 = 1");
+                    stringBuilder.Append(("MySQL"==dbType)? $"SELECT IFNULL(materielIdentfication,0)  AS ID FROM `{node.TmpId}` WHERE 1 = 1" : $"SELECT ISNULL(materielIdentfication,0)  AS ID FROM [{node.TmpId}] WHERE 1 = 1");
                     foreach (var attribute in node.Attributes.Where(m => m.Flag == "1"))
                     {
                         var value = (attribute.Type == "C") ? ("'" + attribute.Values[0].Trim() + "'") : attribute.Values[0].Trim();
@@ -509,7 +509,7 @@ namespace BOM.Models
             list.Add(node);
 
             //获取当前节点的所有子模板信息
-            sql = $"SELECT CTmpId, rlSeqNo　FROM RELATION WHERE TmpId = {node.TmpId} and LockFlag = 1 ORDER BY CTmpId, rlSeqNo";
+            sql = $"SELECT CTmpId, rlSeqNo FROM RELATION WHERE TmpId = {node.TmpId} and LockFlag = 1 ORDER BY CTmpId, rlSeqNo";
             command.CommandText = sql;
 
             reader = command.ExecuteReader();

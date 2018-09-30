@@ -14,8 +14,9 @@ namespace BOM.Models
         string dbType = ConfigurationManager.AppSettings["DbType"]; 
 
         //新建根物料模板
-        public void CreateTemplet(string templetName, string creater)
+        public string CreateTemplet(string templetName, string creater)
         {
+            string tmpId = "";
             int result = 0;
             string sql = null;
 
@@ -26,6 +27,7 @@ namespace BOM.Models
                 command.Transaction = transaction;
 
                 //检查模板名称是否重复
+                /* 李爱军要求不检查重复 20180930
                 sql = $"SELECT COUNT(*) FROM TmpInfo WHERE TmpNm = '{templetName}' ";
                 command.CommandText = sql;
                 try
@@ -45,10 +47,11 @@ namespace BOM.Models
                     connection.Close();
                     throw new Exception("模板名称重复!");
                 }
+                */
 
                 //登记模板信息
                 SeqNo seqNo = new SeqNo();
-                string tmpId = seqNo.GetBaseSeqNo();
+                tmpId = seqNo.GetBaseSeqNo();
                 
                 sql = $"INSERT INTO TmpInfo (TmpId, TmpNm, Root, LockCount, CrtDate, Crter, EditLock, DCM) VALUES ({tmpId}, '{templetName}', '0', 0, '{DateTime.Now}', '{creater}', 0, 0) ";
                 command.CommandText = sql;
@@ -73,7 +76,7 @@ namespace BOM.Models
                 }
 
                 //登记根物料模板表Relation,TmpId='99',旧系统为'root'
-                sql = $"INSERT INTO Relation (TmpId, CTmpId, CTmpNum, LockFlag, CrtDate, Crter, rlSeqNo) VALUES (99, {tmpId}, 0, 0, '{DateTime.Now}', '{creater}', 0) ";
+                sql = $"INSERT INTO Relation (TmpId, CTmpId, CTmpNm, CTmpNum, LockFlag, CrtDate, Crter, rlSeqNo) VALUES (99, {tmpId}, '{templetName}',0, 0, '{DateTime.Now}', '{creater}', 0) ";
                 command.CommandText = sql;
                 try
                 {
@@ -97,14 +100,16 @@ namespace BOM.Models
             }
             transaction.Commit();
             connection.Close();
+            return tmpId;
         }
 
         //新建物料信息(非根物料节点,无参考模板,上送父模板ID和新模板名称)
-        public void CreateTemplet(long parentTempletId, string templetName, string creater)
+        public string CreateTemplet(long parentTempletId, string templetName, string creater)
         {
             int result = 0;
             int rlSeqNo = -1;
             string sql = null;
+            string tmpId = "";
 
             DbConnection connection = DbUtilities.GetConnection();
             DbTransaction transaction = connection.BeginTransaction();
@@ -113,6 +118,7 @@ namespace BOM.Models
                 command.Transaction = transaction;
 
                 //检查有无重复模板名称
+                /* 李爱军要求不检查重复 20180930
                 sql = $"SELECT COUNT(*) FROM TmpInfo WHERE TmpNm = '{templetName}' ";
                 command.CommandText = sql;
                 try
@@ -132,6 +138,7 @@ namespace BOM.Models
                     connection.Close();
                     throw new Exception("模板名称重复!");
                 }
+                */
 
                 //检查父模板是否存在
                 sql = $"SELECT COUNT(*) FROM TmpInfo WHERE TmpId = '{parentTempletId}' ";
@@ -156,7 +163,7 @@ namespace BOM.Models
 
                 //登记新模板信息
                 SeqNo seqNo = new SeqNo();
-                string tmpId = seqNo.GetBaseSeqNo();
+                tmpId = seqNo.GetBaseSeqNo();
                 sql = $"INSERT INTO TmpInfo (TmpId, TmpNm, Root, LockCount, CrtDate, Crter, EditLock, DCM) VALUES ({tmpId}, '{templetName}', '0', 0, '{DateTime.Now}', '{creater}', 0, 0) ";
                 command.CommandText = sql;
                 try
@@ -206,7 +213,7 @@ namespace BOM.Models
                 rlSeqNo++;
 
                 //Insert Relation
-                sql = $"INSERT INTO RELATION (TmpId, CTmpId, CTmpNum, LockFlag, CrtDate, Crter, rlSeqNo) VALUES ({parentTempletId}, {tmpId}, 0, 0, '{DateTime.Now}', '{creater}',{rlSeqNo})";
+                sql = $"INSERT INTO RELATION (TmpId, CTmpId, CTmpNm, CTmpNum, LockFlag, CrtDate, Crter, rlSeqNo) VALUES ({parentTempletId}, {tmpId}, '{templetName}',0, 0, '{DateTime.Now}', '{creater}',{rlSeqNo})";
                 command.CommandText = sql;
                 try
                 {
@@ -254,6 +261,7 @@ namespace BOM.Models
 
             }
             connection.Close();
+            return tmpId;
         }
 
         //新建物料信息(非根物料节点,有参考模板,父模板)
@@ -262,6 +270,7 @@ namespace BOM.Models
             int result = 0;
             int rlSeqNo = -1;
             string sql = null;
+            string tmpNm = null;
 
             DbConnection connection = DbUtilities.GetConnection();
             DbTransaction transaction = connection.BeginTransaction();
@@ -270,17 +279,30 @@ namespace BOM.Models
                 command.Transaction = transaction;
 
 
-                //登记数据库表Relation
+                //获取子模版名称
+                sql = $"select TmpNm from tmpinfo where tmpid = {referenceTempletId}";
+                command.CommandText = sql;
+                try
+                {
+                    tmpNm = Convert.ToString(command.ExecuteScalar());
+                }
+                catch (Exception e)
+                {
+                    log.Error(string.Format($"Select Table TmpInfo error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                    transaction.Rollback();
+                    connection.Close();
+                    throw;
+                }
 
                 //获取Relation.rlSeqNo的值
                 if ("MySQL" == dbType)
                 {
-                    sql = $"SELECT IFNULL(MAX(rlSeqNo),-1) FROM RELATION WHERE TmpId = '{parentTempletId}' and CTmpId = '{referenceTempletId}'";
+                    sql = $"SELECT IFNULL(MAX(rlSeqNo),-1) FROM RELATION WHERE TmpId = {parentTempletId} and CTmpId = {referenceTempletId}";
 
                 }
                 else
                 {
-                    sql = $"SELECT ISNULL(MAX(rlSeqNo),-1) FROM RELATION WHERE TmpId = '{parentTempletId}' and CTmpId = '{referenceTempletId}'";
+                    sql = $"SELECT ISNULL(MAX(rlSeqNo),-1) FROM RELATION WHERE TmpId = {parentTempletId} and CTmpId = {referenceTempletId}";
 
                 }
                 command.CommandText = sql;
@@ -298,7 +320,7 @@ namespace BOM.Models
                 rlSeqNo++;
 
                 //Insert Relation
-                sql = $"INSERT INTO RELATION (TmpId, CTmpId, CTmpNum, LockFlag, CrtDate, Crter, rlSeqNo) VALUES ({parentTempletId}, {referenceTempletId}, 0, 0, '{DateTime.Now}', '{creater}', {rlSeqNo})";
+                sql = $"INSERT INTO RELATION (TmpId, CTmpId, CTmpNm, CTmpNum, LockFlag, CrtDate, Crter, rlSeqNo) VALUES ({parentTempletId}, {referenceTempletId}, '{tmpNm}',0, 0, '{DateTime.Now}', '{creater}', {rlSeqNo})";
                 command.CommandText = sql;
                 try
                 {
@@ -360,26 +382,30 @@ namespace BOM.Models
                 command.Transaction = transaction;
 
                 //Delete AttrPass
-                sql = $"DELETE FROM  AttrPass  where TmpId = '{parentTempletId}' and CTmpId = '{TempletId}' and rlseqno = {rlSeqNo}";
-                command.CommandText = sql;
-                try
+                if (parentTempletId != 99) //根物料在AttrPass表中没有数据
                 {
-                    result = command.ExecuteNonQuery();
+                    sql = $"DELETE FROM  AttrPass  where TmpId = {parentTempletId} and CTmpId = {TempletId} and rlseqno = {rlSeqNo}";
+                    command.CommandText = sql;
+                    try
+                    {
+                        result = command.ExecuteNonQuery();
+                    }
+                    catch (Exception e)
+                    {
+                        log.Error(string.Format($"Delete AttrPass error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                        transaction.Rollback();
+                        connection.Close();
+                        throw;
+                    }
+                    if (result == 0)
+                    {
+                        log.Error(string.Format($"Delete Attrpass 0 record\nsql[{sql}]\n"));
+                        transaction.Rollback();
+                        connection.Close();
+                        throw new Exception("Delete Attrpass 0 record!");
+                    }
                 }
-                catch (Exception e)
-                {
-                    log.Error(string.Format($"Delete AttrPass error!\nsql[{sql}]\nError[{e.StackTrace}]"));
-                    transaction.Rollback();
-                    connection.Close();
-                    throw;
-                }
-                if (result == 0)
-                {
-                    log.Error(string.Format($"Delete Attrpass 0 record\nsql[{sql}]\n"));
-                    transaction.Rollback();
-                    connection.Close();
-                    throw new Exception("Delete Attrpass 0 record!");
-                }
+               
 
                 //Delete Relation
                 sql = $"DELETE FROM  Relation  where TmpId = '{parentTempletId}' and CTmpId = '{TempletId}' and rlseqno = {rlSeqNo}";

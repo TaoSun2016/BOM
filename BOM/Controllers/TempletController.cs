@@ -14,12 +14,13 @@ namespace BOM.Controllers
         log4net.ILog log = log4net.LogManager.GetLogger("Templet");
         [HttpPost]
         [Route("CreateRoot")]
-        public void CreateRoot(string templetName, string creater)
+        public string CreateRoot(string templetName, string creater)
         {
+            
             Templet templet = new Templet();
             try
             {
-                templet.CreateTemplet(templetName, creater);
+                return templet.CreateTemplet(templetName, creater);
             }
             catch (Exception e)
             {
@@ -36,12 +37,12 @@ namespace BOM.Controllers
 
         [HttpPost]
         [Route("CreateChild")]
-        public void CreateChildWithoutTemplet(long parentTempletId,string templetName, string creater)
+        public string CreateChildWithoutTemplet(long parentTempletId,string templetName, string creater)
         {
             Templet templet = new Templet();
             try
             {
-                templet.CreateTemplet(parentTempletId,templetName, creater);
+                return templet.CreateTemplet(parentTempletId,templetName, creater);
             }
             catch (Exception e)
             {

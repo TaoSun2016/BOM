@@ -687,7 +687,7 @@ namespace BOM.Models
                         excld = attrPass.Excld;
                         gteq = attrPass.Gteq;
                         lteq = attrPass.Lteq;
-
+                        log.Error(string.Format($"PTmpID[{pNode.TmpId}] CTmpID[{cNode.TmpId}] CSeqNo[{cNode.rlSeqNo}] CAttrID[{cAttrId}] CAttrValue[{cAttrValue}] CAttrType[{CAttrType}] ValueTp[{valueType}] PAttrId[{pAttrId}] Gt[{gt}] Lt[{lt}] Eq[{eq}] Excld[{excld}] Gteq[{gteq}] Lteq[{lteq}]"));
                         //ValueTp变更时即切换规则时,判断上一规则有无计算出值,有则保存到列表再继续下移valueType
                         if (valueType != origValueType && valueTpCount != 0)
                         {

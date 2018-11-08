@@ -427,7 +427,7 @@ namespace BOM.Models
         //根据前台上送节点信息和模板生成模板树
         public void CreateBOMTree(ref List<NodeInfo> list, NodeInfo node)
         {
-            bool uniqFlag = false;
+            int uniqFlag = 0;
             string sql = null;
             StringBuilder stringBuilder = new StringBuilder();
 
@@ -442,22 +442,21 @@ namespace BOM.Models
             if (node.MaterielId == 0L)
             {
                 //判断当前节点所有属性的取值是否唯一
-                uniqFlag = true;
+                uniqFlag = 0;
                 foreach (var attribute in node.Attributes)
                 {
-                    if (attribute.Values.Count > 1)
+                    if ((uniqFlag=attribute.Values.Count) != 1)
                     {
-                        uniqFlag = false;
                         break;
                     }
                 }
 
                 //属性取值唯一则尝试根据属性取值获取物料编码
-                if (uniqFlag)
+                if (uniqFlag == 1)
                 {
                     List<long> materielIdList = new List<long>();
                     stringBuilder.Clear();
-                    stringBuilder.Append(("MySQL"==dbType)? $"SELECT IFNULL(materielIdentfication,0)  AS ID FROM `{node.TmpId}` WHERE 1 = 1" : $"SELECT ISNULL(materielIdentfication,0)  AS ID FROM [{node.TmpId}] WHERE 1 = 1");
+                    stringBuilder.Append(("MySQL" == dbType) ? $"SELECT IFNULL(materielIdentfication,0)  AS ID FROM `{node.TmpId}` WHERE 1 = 1" : $"SELECT ISNULL(materielIdentfication,0)  AS ID FROM [{node.TmpId}] WHERE 1 = 1");
                     foreach (var attribute in node.Attributes.Where(m => m.Flag == "1"))
                     {
                         var value = (attribute.Type == "C") ? ("'" + attribute.Values[0].Trim() + "'") : attribute.Values[0].Trim();
@@ -494,12 +493,15 @@ namespace BOM.Models
                     }
 
                 }
-                else
+                else if (uniqFlag > 1)
                 {
                     //属性取值不唯一则登记节点并停止该节点以后的遍历
                     node.MaterielId = 88888888L;
                     list.Add(node);
                     return;
+                }
+                else {
+                    //该属性指为空，无法根据私有属性查找物料编码
                 }
             }
 
@@ -507,6 +509,7 @@ namespace BOM.Models
 
             //登记当前节点到节点列表
             list.Add(node);
+            LogNode(node);
 
             //获取当前节点的所有子模板信息
             sql = $"SELECT CTmpId, rlSeqNo FROM RELATION WHERE TmpId = {node.TmpId} and LockFlag = 1 ORDER BY CTmpId, rlSeqNo";

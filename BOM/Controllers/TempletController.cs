@@ -16,7 +16,6 @@ namespace BOM.Controllers
         [Route("CreateRoot")]
         public string CreateRoot(string templetName, string creater)
         {
-            
             Templet templet = new Templet();
             try
             {

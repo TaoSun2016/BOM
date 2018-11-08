@@ -114,8 +114,9 @@ namespace Test
             //Console.WriteLine(node.nodes[1].id);
 
             //test string split method
-            //string stringTest = "aaa-a+b*c/d";
+            //string stringTest = "0";
             //var result = stringTest.Split('+', '-', '*', '/');
+            //Console.WriteLine("result"+result);
             //foreach (var i in result)
             //{
             //    Console.WriteLine("[" + i + "]");
@@ -288,9 +289,19 @@ namespace Test
 
             //cmd.Dispose();
             //sqlConnection.Close();
-            TestMySQL();
+            //TestMySQL();
+            //TestListFind();
+            TestUnllListUnion();
         }
+        public static void TestUnllListUnion()
+        {
+            List<string> values = new List<string>();
+            List<string> midValues = new List<string>();
 
+            values.Union(midValues);
+            Console.WriteLine(values.Count);
+
+        }
 
         public static void TestMySQL()
         {
@@ -339,6 +350,12 @@ namespace Test
                 }
             }
             log.Info("=====================");
+        }
+         public static void TestListFind()
+        {
+            List<string> list = new List<string> { "aa", "bb" };
+            var item = list.Find(m=>m=="cc");
+            Console.WriteLine(item.Length);
         }
     }
 

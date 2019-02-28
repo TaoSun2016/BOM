@@ -297,8 +297,22 @@ namespace Test
         {
             List<string> values = new List<string>();
             List<string> midValues = new List<string>();
+            values.Add("bad");
+            midValues.Add("good");
 
-            values.Union(midValues);
+            foreach (var i in midValues)
+            {
+                Console.WriteLine(i);
+            }
+            foreach (var i in values)
+            {
+                Console.WriteLine(i);
+            }
+            values = values.Union(midValues).ToList();
+            foreach (var i in values)
+            {
+                Console.WriteLine(i);
+            }
             Console.WriteLine(values.Count);
 
         }

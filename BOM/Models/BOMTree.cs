@@ -442,6 +442,7 @@ namespace BOM.Models
             if (node.MaterielId == 0L)
             {
                 //判断当前节点所有属性的取值是否唯一
+                //应该唯一，否则停止处理
                 uniqFlag = 0;
                 foreach (var attribute in node.Attributes)
                 {
@@ -696,7 +697,15 @@ namespace BOM.Models
                         {
                             if (verified)
                             {
-                                values.Union(midValues);
+                                values = values.Union(midValues).ToList();
+                                foreach (var i in midValues)
+                                {
+                                    log.Error($"midValues=[{i}]");
+                                }
+                                foreach (var i in values)
+                                {
+                                    log.Error($"values=[{i}]");
+                                }
                             }
                             //初始化属性取值
                             verified = true;
@@ -729,6 +738,7 @@ namespace BOM.Models
                             foundNum = 0;
                             foreach (var pValue in attr.Values)
                             {
+                                log.Error($"pattrValue=[{pValue}]");
                                 //检查是否满足Excld的情况：父属性不能取excld字段中的值
                                 if (!string.IsNullOrEmpty(excld) && excld != "NULL")
                                 {
@@ -759,6 +769,7 @@ namespace BOM.Models
                                     {
                                         if (pValue == element)
                                         {
+                                            log.Error($"equal parentValue=[{pValue}]");
                                             found = true;
                                             break;
                                         }
@@ -767,10 +778,13 @@ namespace BOM.Models
                                     {
                                         midValues.Add(CalculateAttrbuteValue(pNode, CAttrType, cAttrValue));
                                         foundNum++;
+                                        log.Error($"midValues=[{midValues}]");
+                                        log.Error($"foundNum=[{foundNum}]");
                                         continue;
                                     }
                                 }
                             }
+                            log.Error($"at last foundNum=[{foundNum}]");
                             if (foundNum == 0)
                             {
                                 verified = false;
@@ -1037,16 +1051,17 @@ namespace BOM.Models
                         }
                     }
 
-
+                    log.Error($"verifiedFlag=[{verified}] valueTpCount=[{valueTpCount}] defaultValue=[{defaultValue}]");
                     if (verified && valueTpCount > 0)
                     {
-                        values.Union(midValues);
+                        values = values.Union(midValues).ToList();
                     }
                     //如果根据父节点属性无法计算子节点属性值,并且子节点属性有缺省值,则赋缺省值
                     if (values.Count == 0 && !string.IsNullOrEmpty(defaultValue))
                     {
                         values.Add(defaultValue);
                     }
+                    log.Error($"values=[{values}]");
                     if (values.Count > 0)
                     {
                         attribute.Values.AddRange(values);

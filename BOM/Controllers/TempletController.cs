@@ -36,12 +36,12 @@ namespace BOM.Controllers
 
         [HttpPost]
         [Route("CreateChild")]
-        public string CreateChildWithoutTemplet(long parentTempletId,string templetName, string creater)
+        public string CreateChildWithoutTemplet(long parentTempletId,string templetName, long pId, string creater)
         {
             Templet templet = new Templet();
             try
             {
-                return templet.CreateTemplet(parentTempletId,templetName, creater);
+                return templet.CreateTemplet(parentTempletId,templetName, pId, creater);
             }
             catch (Exception e)
             {
@@ -58,12 +58,12 @@ namespace BOM.Controllers
 
         [HttpPost]
         [Route("CreateWithTemplet")]
-        public void CreateCopiedTemplet(long parentTempletId, long referenceTempletId, string creater)
+        public void CreateCopiedTemplet(long parentTempletId, long referenceTempletId, long pId, string creater)
         {
             Templet templet = new Templet();
             try
             {
-                templet.CreateCopiedTemplet(parentTempletId, referenceTempletId, creater);
+                templet.CreateCopiedTemplet(parentTempletId, referenceTempletId, pId, creater);
             }
             catch (Exception e)
             {

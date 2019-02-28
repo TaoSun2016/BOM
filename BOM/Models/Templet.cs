@@ -76,7 +76,7 @@ namespace BOM.Models
                 }
 
                 //登记根物料模板表Relation,TmpId='99',旧系统为'root'
-                sql = $"INSERT INTO Relation (TmpId, CTmpId, CTmpNm, CTmpNum, LockFlag, CrtDate, Crter, rlSeqNo) VALUES (99, {tmpId}, '{templetName}',0, 0, '{DateTime.Now}', '{creater}', 0) ";
+                sql = $"INSERT INTO Relation (pid, TmpId, CTmpId, CTmpNm, CTmpNum, LockFlag, CrtDate, Crter, rlSeqNo) VALUES (99, 99, {tmpId}, '{templetName}',0, 0, '{DateTime.Now}', '{creater}', 0) ";
                 command.CommandText = sql;
                 try
                 {
@@ -104,7 +104,7 @@ namespace BOM.Models
         }
 
         //新建物料信息(非根物料节点,无参考模板,上送父模板ID和新模板名称)
-        public string CreateTemplet(long parentTempletId, string templetName, string creater)
+        public string CreateTemplet(long parentTempletId, string templetName, long pId, string creater)
         {
             int result = 0;
             int rlSeqNo = -1;
@@ -213,7 +213,7 @@ namespace BOM.Models
                 rlSeqNo++;
 
                 //Insert Relation
-                sql = $"INSERT INTO RELATION (TmpId, CTmpId, CTmpNm, CTmpNum, LockFlag, CrtDate, Crter, rlSeqNo) VALUES ({parentTempletId}, {tmpId}, '{templetName}',0, 0, '{DateTime.Now}', '{creater}',{rlSeqNo})";
+                sql = $"INSERT INTO RELATION (pid,TmpId, CTmpId, CTmpNm, CTmpNum, LockFlag, CrtDate, Crter, rlSeqNo) VALUES ({pId},{parentTempletId}, {tmpId}, '{templetName}',0, 0, '{DateTime.Now}', '{creater}',{rlSeqNo})";
                 command.CommandText = sql;
                 try
                 {
@@ -265,7 +265,7 @@ namespace BOM.Models
         }
 
         //新建物料信息(非根物料节点,有参考模板,父模板)
-        public void CreateCopiedTemplet(long parentTempletId, long referenceTempletId, string creater)
+        public void CreateCopiedTemplet(long parentTempletId, long referenceTempletId, long pId, string creater)
         {
             int result = 0;
             int rlSeqNo = -1;
@@ -320,7 +320,7 @@ namespace BOM.Models
                 rlSeqNo++;
 
                 //Insert Relation
-                sql = $"INSERT INTO RELATION (TmpId, CTmpId, CTmpNm, CTmpNum, LockFlag, CrtDate, Crter, rlSeqNo) VALUES ({parentTempletId}, {referenceTempletId}, '{tmpNm}',0, 0, '{DateTime.Now}', '{creater}', {rlSeqNo})";
+                sql = $"INSERT INTO RELATION (pid, TmpId, CTmpId, CTmpNm, CTmpNum, LockFlag, CrtDate, Crter, rlSeqNo) VALUES ({pId},{parentTempletId}, {referenceTempletId}, '{tmpNm}',0, 0, '{DateTime.Now}', '{creater}', {rlSeqNo})";
                 command.CommandText = sql;
                 try
                 {

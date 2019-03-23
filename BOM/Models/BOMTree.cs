@@ -160,10 +160,14 @@ namespace BOM.Models
             bool hasPrivateAttribute = false;
             string materielIdentification = null;
             string sql = null;
+
+            LogNode(nodeInfo);
+
             StringBuilder insertBuilder = null;
 
             if ("MySQL" == dbType)
             {
+                var aa = new StringBuilder($"INSERT INTO `{nodeInfo.TmpId}` (");
                 insertBuilder = new StringBuilder($"INSERT INTO `{nodeInfo.TmpId}` (");
 
             }
@@ -184,6 +188,8 @@ namespace BOM.Models
                 //当前节点是否有私有属性
                 hasPrivateAttribute = nodeInfo.Attributes.Where(m => m.Flag == "1").Count() > 0;
 
+                log.Debug($"hasPrivateAttribute=[{hasPrivateAttribute}]");
+
                 if (hasPrivateAttribute)
                 {
                     //检查该模板的私有属性表是否存在，表名和模板号相同
@@ -196,6 +202,9 @@ namespace BOM.Models
                         sql = $"SELECT COUNT(*) FROM SYSOBJECTS WHERE NAME = '{nodeInfo.TmpId}' AND TYPE = 'U'";
 
                     }
+
+                    log.Debug($"SQL=[{sql}]");
+
                     command.CommandText = sql;
                     try
                     {
@@ -251,6 +260,8 @@ namespace BOM.Models
                     }
                     sql = builder.ToString();
 
+                    log.Debug($"SQL=[{sql}]");
+
                     command.CommandText = sql;
                     try
                     {
@@ -276,6 +287,8 @@ namespace BOM.Models
 
                 try
                 {
+                    log.Debug($"SQL=[{sql}]");
+
                     command.CommandText = sql;
                     dataReader = command.ExecuteReader();
 
@@ -300,6 +313,8 @@ namespace BOM.Models
                         throw new Exception(string.Format($"Can't find record in table SEQ_NO.[{sql}]"));
                     }
 
+                    log.Debug($"SQL=[{sql}]");
+
                     command.CommandText = sql;
                     result = command.ExecuteNonQuery();
                     if (result == 0)
@@ -322,7 +337,7 @@ namespace BOM.Models
                 if (hasPrivateAttribute)
                 {
                     sql = insertBuilder.ToString() + $" materielIdentfication" + insertValues.ToString() + $" {materielIdentification})";
-
+                    log.Debug($"SQL=[{sql}]");
                     command.CommandText = sql;
                     try
                     {
@@ -363,6 +378,8 @@ namespace BOM.Models
                     }
                 }
                 sql = insertBuilder.ToString() + $" materielIdentfication" + insertValues.ToString() + $" {materielIdentification})";
+
+                log.Debug($"SQL=[{sql}]");
 
                 command.CommandText = sql;
                 try
@@ -691,7 +708,7 @@ namespace BOM.Models
                         excld = attrPass.Excld;
                         gteq = attrPass.Gteq;
                         lteq = attrPass.Lteq;
-                        log.Error(string.Format($"PTmpID[{pNode.TmpId}] CTmpID[{cNode.TmpId}] CSeqNo[{cNode.rlSeqNo}] CAttrID[{cAttrId}] CAttrValue[{cAttrValue}] CAttrType[{CAttrType}] ValueTp[{valueType}] PAttrId[{pAttrId}] Gt[{gt}] Lt[{lt}] Eq[{eq}] Excld[{excld}] Gteq[{gteq}] Lteq[{lteq}]"));
+                        log.Debug(string.Format($"PTmpID[{pNode.TmpId}] CTmpID[{cNode.TmpId}] CSeqNo[{cNode.rlSeqNo}] CAttrID[{cAttrId}] CAttrValue[{cAttrValue}] CAttrType[{CAttrType}] ValueTp[{valueType}] PAttrId[{pAttrId}] Gt[{gt}] Lt[{lt}] Eq[{eq}] Excld[{excld}] Gteq[{gteq}] Lteq[{lteq}]"));
                         //ValueTp变更时即切换规则时,判断上一规则有无计算出值,有则保存到列表再继续下移valueType
                         if (valueType != origValueType && valueTpCount != 0)
                         {
@@ -700,11 +717,11 @@ namespace BOM.Models
                                 values = values.Union(midValues).ToList();
                                 foreach (var i in midValues)
                                 {
-                                    log.Error($"midValues=[{i}]");
+                                    log.Debug($"midValues=[{i}]");
                                 }
                                 foreach (var i in values)
                                 {
-                                    log.Error($"values=[{i}]");
+                                    log.Debug($"values=[{i}]");
                                 }
                             }
                             //初始化属性取值
@@ -713,14 +730,17 @@ namespace BOM.Models
                             origValueType = valueType;
                         }
 
+                        valueTpCount++;
+
                         //属性的缺省值,在此次循环中只保留值,然后进入下一循环，不作其他处理
                         if (valueType == "0")
                         {
                             defaultValue = CalculateAttrbuteValue(pNode, CAttrType, cAttrValue);
+                            origValueType = valueType;
                             continue;
                         }
 
-                        valueTpCount++;
+                        
 
                         //如果同组valuetype中有验证不过的,则该组valuetype后续记录都跳过
                         if (!verified)
@@ -738,7 +758,7 @@ namespace BOM.Models
                             foundNum = 0;
                             foreach (var pValue in attr.Values)
                             {
-                                log.Error($"pattrValue=[{pValue}]");
+                                log.Debug($"pattrValue=[{pValue}]");
                                 //检查是否满足Excld的情况：父属性不能取excld字段中的值
                                 if (!string.IsNullOrEmpty(excld) && excld != "NULL")
                                 {
@@ -769,7 +789,7 @@ namespace BOM.Models
                                     {
                                         if (pValue == element)
                                         {
-                                            log.Error($"equal parentValue=[{pValue}]");
+                                            log.Debug($"equal parentValue=[{pValue}]");
                                             found = true;
                                             break;
                                         }
@@ -778,13 +798,12 @@ namespace BOM.Models
                                     {
                                         midValues.Add(CalculateAttrbuteValue(pNode, CAttrType, cAttrValue));
                                         foundNum++;
-                                        log.Error($"midValues=[{midValues}]");
-                                        log.Error($"foundNum=[{foundNum}]");
+                                        log.Debug($"foundNum=[{foundNum}]");
                                         continue;
                                     }
                                 }
                             }
-                            log.Error($"at last foundNum=[{foundNum}]");
+                            log.Debug($"at last foundNum=[{foundNum}]");
                             if (foundNum == 0)
                             {
                                 verified = false;
@@ -1051,7 +1070,7 @@ namespace BOM.Models
                         }
                     }
 
-                    log.Error($"verifiedFlag=[{verified}] valueTpCount=[{valueTpCount}] defaultValue=[{defaultValue}]");
+                    log.Debug($"verifiedFlag=[{verified}] valueTpCount=[{valueTpCount}] defaultValue=[{defaultValue}]");
                     if (verified && valueTpCount > 0)
                     {
                         values = values.Union(midValues).ToList();
@@ -1061,7 +1080,7 @@ namespace BOM.Models
                     {
                         values.Add(defaultValue);
                     }
-                    log.Error($"values=[{values}]");
+                    log.Debug($"values=[{values}]");
                     if (values.Count > 0)
                     {
                         attribute.Values.AddRange(values);

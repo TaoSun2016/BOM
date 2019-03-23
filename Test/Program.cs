@@ -291,7 +291,17 @@ namespace Test
             //sqlConnection.Close();
             //TestMySQL();
             //TestListFind();
-            TestUnllListUnion();
+            //TestUnllListUnion();
+            TestStringBuilder();
+        }
+
+        public static void TestStringBuilder()
+        {
+            StringBuilder ss = null;
+            string aa = "123";
+
+            ss = new StringBuilder($"aaa`{aa}`(");
+            Console.WriteLine(ss);
         }
         public static void TestUnllListUnion()
         {

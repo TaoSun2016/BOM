@@ -8,7 +8,7 @@ using System.Net.Http;
 using System.Web.Http;
 using System.Data.Common;
 using BOM.DbAccess;
-
+using BOM.Models;
 namespace BOM.Controllers
 {
     [RoutePrefix("BOM")]
@@ -136,16 +136,17 @@ namespace BOM.Controllers
         [Route("SaveBOM")]
         public void SaveBOM(List<NodeInfo> list)
         {
+            log.Info("start");
             bool newMaterielId = false;
             DbConnection connection = DbUtilities.GetConnection();
             DbCommand command = connection.CreateCommand();
             DbTransaction transaction = connection.BeginTransaction();
             command.Transaction = transaction;
 
-
+            log.Info($"{list.Count}");
             BOMTree bomTree = new BOMTree(connection, command, transaction);
 
-
+            log.Info("2");
             try
             {
                 //不同的物料树会包含相同的物料编码吗？？？如果是的话，BOM表主键就不能是materialId,而因该加上PeiTNO,同一BOM数不同节点可能有相同的物料编码吗？
@@ -154,9 +155,11 @@ namespace BOM.Controllers
                 //{
                 //    throw new Exception("根物料编码重复");
                 //}
-
+                log.Info("3");
                 foreach (var node in list)
                 {
+                    bomTree.LogNode(node);
+
                     newMaterielId = (node.MaterielId==0L) ? true : false;
                     
                     bomTree.SaveNode(node);
@@ -187,6 +190,7 @@ namespace BOM.Controllers
                 };
                 throw new HttpResponseException(responseMessge);
             }
+            log.Info("end");
             transaction.Commit();
             command.Dispose();
             connection.Close();

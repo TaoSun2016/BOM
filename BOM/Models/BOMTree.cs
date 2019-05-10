@@ -451,11 +451,12 @@ namespace BOM.Models
 
             NodeInfo child = new NodeInfo();
             List<long> listCtmpId = new List<long>();
+            List<long> listId = new List<long>();
             List<int> listSeqNo = new List<int>();
 
             DbDataReader reader = null;
 
-            //如果没有上送物料编码
+            //如果没有上送物料编码,尝试根据上送私有属性获取物料编码
             if (node.MaterielId == 0L)
             {
                 //判断当前节点所有属性的取值是否唯一
@@ -530,18 +531,20 @@ namespace BOM.Models
             LogNode(node);
 
             //获取当前节点的所有子模板信息
-            sql = $"SELECT CTmpId, rlSeqNo FROM RELATION WHERE TmpId = {node.TmpId} and LockFlag = 1 ORDER BY CTmpId, rlSeqNo";
+            sql = $"SELECT CTmpId, Id, rlSeqNo FROM RELATION WHERE TmpId = {node.TmpId} and LockFlag = 1 and PId = {node.Id} ORDER BY CTmpId, rlSeqNo";
             command.CommandText = sql;
 
             reader = command.ExecuteReader();
             if (reader.HasRows)
             {
                 listCtmpId.Clear();
+                listId.Clear();
                 listSeqNo.Clear();
                 while (reader.Read())
                 {
                     //生成子节点数据
                     listCtmpId.Add(Convert.ToInt64(reader["CTmpId"].ToString()));
+                    listId.Add(Convert.ToInt64(reader["Id"].ToString()));
                     listSeqNo.Add((int)reader["rlSeqNo"]);
 
                 }
@@ -550,6 +553,7 @@ namespace BOM.Models
                 for (int i = 0; i < listCtmpId.Count; i++)
                 {
                     long cTmpId = listCtmpId[i];
+                    long cId = listId[i];
                     int cSeqNo = listSeqNo[i];
                     child = new NodeInfo();
 
@@ -570,6 +574,8 @@ namespace BOM.Models
                             child.TmpId = cTmpId;
                             child.TmpNm = reader[0].ToString();
                             child.rlSeqNo = cSeqNo;
+                            child.PId = node.Id;
+                            child.Id = cId;
                             reader.Close();
                         }
                         else
@@ -1547,12 +1553,13 @@ namespace BOM.Models
             return true;
         }
 
-        private void LogNode(NodeInfo node)
+        public void LogNode(NodeInfo node)
         {
             log.Info("=====================");
             log.Info("NodeLevel=" + node.NodeLevel);
             log.Info("ptmpid=" + node.PTmpId + "  pmaterielid=" + node.pMaterielId);
             log.Info("TmpId=" + node.TmpId + "  materelid=" + node.MaterielId);
+            log.Info("PId=" + node.PId + "  Id=" + node.Id);
             foreach (var attr in node.Attributes)
             {
                 log.Info("---------------------------");
@@ -1580,6 +1587,8 @@ namespace BOM.Models
         public int rlSeqNo { get; set; }
         public decimal Count { get; set; }
         public long peiTNo { get; set; }
+        public long PId { get; set; }
+        public long Id { get; set; }
         public List<TempletAttribute> Attributes { get; set; }
         public NodeInfo()
         {
@@ -1592,6 +1601,8 @@ namespace BOM.Models
             MaterielId = 0;
             rlSeqNo = 0;
             Count = 0.00m;
+            PId = 0L;
+            Id = 0L;
             Attributes = new List<TempletAttribute>();
         }
     }

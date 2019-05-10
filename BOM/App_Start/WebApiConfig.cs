@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Web.Http;
+using System.Web.Http.Cors;
 
 namespace BOM
 {
@@ -18,6 +19,9 @@ namespace BOM
                 routeTemplate: "api/{controller}/{id}",
                 defaults: new { id = RouteParameter.Optional }
             );
+
+            //支持跨域访问
+            config.EnableCors(new EnableCorsAttribute("*", "*", "*"));
         }
     }
 }

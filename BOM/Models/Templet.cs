@@ -53,7 +53,7 @@ namespace BOM.Models
                 SeqNo seqNo = new SeqNo();
                 tmpId = seqNo.GetBaseSeqNo();
                 
-                sql = $"INSERT INTO TmpInfo (TmpId, TmpNm, Root, LockCount, CrtDate, Crter, EditLock, DCM) VALUES ({tmpId}, '{templetName}', '0', 0, '{DateTime.Now}', '{creater}', 0, 0) ";
+                sql = $"INSERT INTO TmpInfo (TmpId, TmpNm, Root, LockCount, CrtDate, Crter, EditLock, DCM) VALUES ({tmpId}, '{templetName}', '1', 0, '{DateTime.Now}', '{creater}', 0, 0) ";
                 command.CommandText = sql;
                 try
                 {

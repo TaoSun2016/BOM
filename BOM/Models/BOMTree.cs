@@ -1488,6 +1488,8 @@ namespace BOM.Models
                 //如果前台上送有物料编码. 当前台有物料编码时是否还允许用户修改物料的属性,如果允许修改后如果和其他物料属性值一样怎么办??
             }
 
+
+
             //生成更新DCM码
             int dcm = 0;
             sql = $"SELECT DCM FROM TmpInfo WHERE TmpId = {node.TmpId}";
@@ -1527,6 +1529,24 @@ namespace BOM.Models
                 log.Error($"Update DCM Error,TmpID=[{node.TmpId}]sql=[{sql}]error[{e.StackTrace}][{e}][{e.Message}]");
                 dataReader.Close();
                 throw;
+            }
+
+            //检查BOM表中是否已经存在重复BOM记录，如有重复，跳过该节点处理下一噶。 根据materielIdentfication, CmId 和 rlSeqNo判重。
+            sql = $"SELECT COUNT(*) FROM BOM WHERE materielIdentfication = '{node.pMaterielId}' and CmId = '{node.MaterielId}' and rlSeqNo = {node.rlSeqNo}";
+
+            command.CommandText = sql;
+            try
+            {
+                result = Convert.ToInt32(command.ExecuteScalar());
+            }
+            catch (Exception e)
+            {
+                log.Error(string.Format($"Look for talbe BOM Error!\nsql[{sql}]\nError[{e.StackTrace}]"));
+                throw;
+            }
+            if (result > 0)
+            {
+                return true;
             }
 
             //登记表BOM 

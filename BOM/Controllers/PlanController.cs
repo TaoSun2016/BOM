@@ -19,17 +19,25 @@ namespace BOM.Controllers
 
         [HttpPost]
         [Route("Plan")]
-        public void CreatePlan(PlanRequest request)
+        public void CreatePlan(List<PlanItem> requestItems)
         {
+            log.Error("plan-1");
+            foreach (PlanItem item in requestItems)
+            {
+                log.Error("list item - " + item.wuLBM.ToString());
+                log.Error("list item - " + item.gongZLH);
+                log.Error("list item - " + item.qiH);
+            }
+
             //PlanRequest request = new PlanRequest();
             DbConnection connection = DbUtilities.GetConnection();
             DbCommand command = connection.CreateCommand();
             DbTransaction transaction = connection.BeginTransaction();
             command.Transaction = transaction;
 
-            Plan plan = new Plan(request.option, connection, command, transaction);
-
-            if (!plan.CreatePlan(request.requestItems))
+            Plan plan = new Plan(requestItems[0].option, connection, command, transaction);
+            log.Error("plan-2");
+            if (!plan.CreatePlan(requestItems))
             {
                 transaction.Rollback();
                 command.Dispose();
@@ -44,6 +52,7 @@ namespace BOM.Controllers
                 };
                 throw new HttpResponseException(responseMessge);
             }
+            log.Error("plan-4");
             transaction.Commit();
             command.Dispose();
             connection.Close();

@@ -39,6 +39,12 @@ namespace BOM.Models
         /// </summary>
         public bool CreatePlan(List<PlanItem> requestItems)
         {
+
+            foreach (PlanItem item in requestItems)
+            {
+                log.Error("list item - "+item.wuLBM.ToString());
+            }
+
             int i = 0;
             List<PlanItem> items = requestItems.OrderBy(m => m.qiH).ThenBy(m => m.xuH).ThenBy(m => m.gongZLH).ToList();
 
@@ -53,6 +59,9 @@ namespace BOM.Models
             foreach (PlanItem item in items)
             {
                 i++;
+
+                log.Error("iterate 0");
+                
                 if (option == 2)//续排
                 {
                     if (!GetTableFlag(item))
@@ -72,9 +81,12 @@ namespace BOM.Models
                     log.Error(string.Format($"数据检查失败，BOMID={item.wuLBM}\n"));
                     return false;
                 }
+                log.Error("finish init bom tree");
 
                 //遍历BOM树，将各物料所需的实际数量登记到stocks.shuL中
                 Calculate(i, item);
+
+                log.Error("finish calculating");
 
                 //处理当前记录，令号，期号，顺序号
                 if (!ProcessOrder(i, item))
@@ -82,7 +94,7 @@ namespace BOM.Models
                     log.Error(string.Format($"Process Order Failed!\n"));
                     return false;
                 }
-
+                log.Error("fiish order");
                 //重排，续排才处理
                 if (option == 1 || option == 2)
                 {
@@ -562,6 +574,7 @@ namespace BOM.Models
 
             foreach (Stock stock in stocks.Where(m => m.flag == i))
             {
+                log.Error("process order 0");
                 //预计在库量 POH
                 POH = stock.PAB - stock.shuL;
 
@@ -574,7 +587,7 @@ namespace BOM.Models
                 {
                     NR = stock.SS - POH;
                 }
-
+                log.Error("NR ="+ NR + "LS = "+stock.LS);
                 //计算计划订单收料量PORC,即为缺件数量
                 PORC = 0.0000m;
                 if (NR > 0.00005m)
@@ -584,10 +597,10 @@ namespace BOM.Models
                         PORC += stock.LS;
                     } while (PORC - NR < -0.00005m);
                 }
-
+                log.Error("PORC =" +PORC);
                 //计算本期库存数量PAB = 计划订单收料量PORC + 预计在库量POH
                 stock.PAB = PORC + POH;
-
+                log.Error("process order 1");
                 //所有的生产形式都要登记缺件表
                 var tableName = "";
                 switch (option)
@@ -623,7 +636,7 @@ namespace BOM.Models
                     log.Error(string.Format($"update ullageTempSingle Error\nsql[{sql}]\nError[{e.StackTrace}]"));
                     return false;
                 }
-
+                log.Error("process order 2");
                 //预排不再进行后续处理
                 if (option == 3 || option == 4)
                 {
@@ -956,7 +969,9 @@ namespace BOM.Models
                     default:
                         break;
                 }
+                log.Error("process order 3");
             }
+            log.Error("process order end");
             return true;
         }
 
@@ -1004,6 +1019,7 @@ namespace BOM.Models
 
     public class PlanItem
     {
+        public int option;       
         public long wuLBM;         //物料编码
         public decimal shuL;       //数量
         public string gongZLH;     //工作令号

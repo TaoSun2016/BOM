@@ -24,7 +24,7 @@ namespace BOM.Models
 
 
 
-            string sql = @"SELECT * FROM SEQ_NO WHERE Ind_Key = '0'";
+            string sql = @"SELECT * FROM SEQ_NO WHERE Ind_Key = '0' FOR UPDATE";
 
             using (DbCommand command = connection.CreateCommand())
             {
@@ -48,6 +48,7 @@ namespace BOM.Models
                 else
                 {
                     dataReader.Close();
+                    transaction.Rollback();
                     connection.Close();
                     throw new Exception("There is no base parameter!");
                 }
@@ -82,7 +83,7 @@ namespace BOM.Models
             string seqNo = null;
 
             DbConnection connection = DbUtilities.GetConnection();
-            string sql = $"SELECT * FROM SEQ_NO WHERE Ind_Key = '{tmpId}'";
+            string sql = $"SELECT * FROM SEQ_NO WHERE Ind_Key = '{tmpId}' FOR UPDATE";
             DbTransaction transaction = connection.BeginTransaction();
             using (DbCommand command = connection.CreateCommand())
             {
@@ -107,6 +108,7 @@ namespace BOM.Models
                 {
                     log.Error(string.Format($"找不到物料参数记录,TmpID=[{tmpId}]"));
                     dataReader.Close();
+                    transaction.Rollback();
                     connection.Close();
                     throw new Exception(string.Format($"找不到物料参数记录,TmpID=[{tmpId}]"));
                 }

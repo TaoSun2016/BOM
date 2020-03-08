@@ -11,6 +11,9 @@ namespace BOM
         public static void Register(HttpConfiguration config)
         {
             // Web API configuration and services
+
+            //支持跨域访问
+            config.EnableCors(new EnableCorsAttribute("*", "*", "*"));
             // Web API routes
             config.MapHttpAttributeRoutes();
 
@@ -20,8 +23,7 @@ namespace BOM
                 defaults: new { id = RouteParameter.Optional }
             );
 
-            //支持跨域访问
-            config.EnableCors(new EnableCorsAttribute("*", "*", "*"));
+
         }
     }
 }

@@ -283,7 +283,7 @@ namespace BOM.Models
 
 
                 //生成物料编码
-                sql = $"SELECT NEXT_NO FROM SEQ_NO WHERE Ind_Key = '{nodeInfo.TmpId}'";
+                sql = $"SELECT NEXT_NO FROM SEQ_NO WHERE Ind_Key = '{nodeInfo.TmpId}' FOR UPDATE";
 
                 try
                 {
@@ -1344,7 +1344,7 @@ namespace BOM.Models
                     if (result == 0)
                     {
                         //Get Materiel Identification
-                        sql = $"SELECT NEXT_NO FROM SEQ_NO WHERE Ind_Key = '{node.TmpId}'";
+                        sql = $"SELECT NEXT_NO FROM SEQ_NO WHERE Ind_Key = '{node.TmpId}' FOR UPDATE";
                         try
                         {
                             command.CommandText = sql;
